@@ -2,8 +2,10 @@
 # Build multi-stage : stage 1 = compilation, stage 2 = runtime minimal.
 
 # --- Stage 1 : builder ---
-# On utilise node:22-alpine (LTS) pour compiler le projet TypeScript.
-FROM node:22-alpine AS builder
+# node:24-alpine correspond à la version Node utilisée sur le poste de dev (Node 24 / npm 11).
+# Garder la même version majeure évite une incompatibilité du package-lock.json
+# entre le npm qui l'a généré (npm 11) et celui du container (npm 11 aussi).
+FROM node:24-alpine AS builder
 WORKDIR /app
 
 # Copie d'abord package.json + package-lock.json pour exploiter le cache Docker.
@@ -17,7 +19,8 @@ RUN npm run build
 
 # --- Stage 2 : runtime ---
 # Image finale plus légère : on ne garde que le code compilé (dist/) et les deps de production.
-FROM node:22-alpine
+# Même version de Node que le builder (voir commentaire stage 1).
+FROM node:24-alpine
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
