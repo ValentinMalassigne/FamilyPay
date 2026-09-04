@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:gql/ast.dart' show OperationType;
 import 'package:graphql_flutter/graphql_flutter.dart';
 
+import '../screens/auth_gate.dart';
+
 /// Fabrique un [ValueNotifier<GraphQLClient>] configuré pour le backend
 /// FamilyPay.
 ///
@@ -54,8 +56,12 @@ ValueNotifier<GraphQLClient> initGraphqlClient({
   );
 }
 
-/// Placeholder UI temporaire : sera remplacé par les écrans réels
-/// (login, solde, etc.) sur les branches feat/mobile-* à venir.
+/// Widget racine de l'app FamilyPay.
+///
+/// [GraphQLProvider] expose le client GraphQL à toute la sous-arborescence
+/// via InheritedWidget, pour que les widgets Query/Mutation/Subscription
+/// puissent l'utiliser sans le passer manuellement.
+/// [AuthGate] gère le routage login vs home selon l'état d'authentification.
 class FamilyPayApp extends StatelessWidget {
   const FamilyPayApp({super.key, required this.client});
 
@@ -63,9 +69,6 @@ class FamilyPayApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // GraphQLProvider : expose le client GraphQL à toute la sous-arborescence
-    // via InheritedWidget, pour que les widgets Query/Mutation/Subscription
-    // puissent l'utiliser sans le passer manuellement.
     return GraphQLProvider(
       client: client,
       child: MaterialApp(
@@ -74,24 +77,7 @@ class FamilyPayApp extends StatelessWidget {
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
           useMaterial3: true,
         ),
-        home: const _PlaceholderScreen(),
-      ),
-    );
-  }
-}
-
-class _PlaceholderScreen extends StatelessWidget {
-  const _PlaceholderScreen();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('FamilyPay')),
-      body: const Center(
-        child: Text(
-          'App initialisée — écrans à venir',
-          textAlign: TextAlign.center,
-        ),
+        home: const AuthGate(),
       ),
     );
   }

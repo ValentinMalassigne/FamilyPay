@@ -1,29 +1,35 @@
 import 'package:flutter/foundation.dart';
 
-/// Stockage en mémoire du JWT de l'enfant connecté.
+import '../models/app_user.dart';
+
+/// Stockage en mémoire du JWT et du profil de l'utilisateur connecté.
 ///
-/// Stub pour l'initialisation : la persistance réelle (shared_preferences)
-/// viendra sur la branche feat/mobile-auth. En l'état, le token est perdu à
-/// chaque redémarrage de l'app — c'est attendu pour ce squelette.
+/// La persistance réelle (shared_preferences) viendra plus tard. En l'état,
+/// le token est perdu à chaque redémarrage de l'app — c'est attendu pour
+/// cette itération.
 ///
 /// [ChangeNotifier] : permet au widget arbre (via `provider`) d'être notifié
-/// quand le token change, pour rafraîchir le client GraphQL si besoin.
+/// quand l'état d'auth change, pour rafraîchir l'UI (login vs home).
 class TokenStore extends ChangeNotifier {
   String? _token;
+  AppUser? _user;
 
   String? get token => _token;
+  AppUser? get user => _user;
 
   bool get isAuthenticated => _token != null;
 
-  /// Stocke le JWT et notifie les listeners.
-  void setToken(String? token) {
+  /// Stocke le JWT + l'utilisateur et notifie les listeners.
+  void setSession(String token, AppUser user) {
     _token = token;
+    _user = user;
     notifyListeners();
   }
 
-  /// Efface le JWT (déconnexion).
+  /// Efface le JWT et l'utilisateur (déconnexion).
   void clear() {
     _token = null;
+    _user = null;
     notifyListeners();
   }
 }
