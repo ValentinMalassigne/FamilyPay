@@ -4,6 +4,8 @@ import { GraphQLModule } from '@nestjs/graphql';
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { HealthModule } from './health/health.module.js';
+import { UsersModule } from './users/users.module.js';
+import { AuthModule } from './auth/auth.module.js';
 
 /*
  * AppModule : module racine de l'application NestJS.
@@ -79,6 +81,12 @@ import { HealthModule } from './health/health.module.js';
 
     // HealthModule : endpoint GET /health pour le health-check (load balancer / orchestrateur cloud).
     HealthModule,
+
+    // UsersModule : entités User/Family/ChildAccount + resolvers (me, createChildAccount, createParentAccount).
+    UsersModule,
+
+    // AuthModule : login + signup, JWT, guards (GqlAuthGuard, RolesGuard).
+    AuthModule,
   ],
 })
 export class AppModule {}
