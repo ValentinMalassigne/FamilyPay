@@ -20,8 +20,8 @@ services:
       retries: 5
 
   # --- Services applicatifs ---
-  # backend : ré-activé (le Dockerfile est posé sur la branche backend).
-  # nextjs : reste commenté jusqu'à la branche web (Dockerfile Next.js pas encore créé).
+  # backend : NestJS (GraphQL + TypeORM + PostgreSQL).
+  # nextjs : front Next.js (espace parent + page publique de don).
   backend:
     build:
       context: ../backend
@@ -38,17 +38,20 @@ services:
     ports:
       - "${BACKEND_PORT:-3000}:3000"
 
-  # nextjs:
-  #   build:
-  #     context: ../web
-  #     dockerfile: Dockerfile
-  #   restart: unless-stopped
-  #   depends_on:
-  #     - backend
-  #   environment:
-  #     NEXT_PUBLIC_GRAPHQL_URL: ${NEXT_PUBLIC_GRAPHQL_URL:-http://localhost:3000/graphql}
-  #   ports:
-  #     - "3001:3000"
+  nextjs:
+    build:
+      context: ../web
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      # NEXT_PUBLIC_* est lue au build Next.js et baked dans le bundle client.
+      # Elle doit pointer vers une URL accessible depuis le navigateur (pas
+      # depuis le réseau Docker) → http://localhost:3000/graphql en dev local.
+      NEXT_PUBLIC_GRAPHQL_URL: ${NEXT_PUBLIC_GRAPHQL_URL:-http://localhost:3000/graphql}
+    ports:
+      - "${WEB_PORT:-3001}:3000"
 
   # Optionnel : pub/sub pour les subscriptions GraphQL (décommenter si besoin)
   # redis:
