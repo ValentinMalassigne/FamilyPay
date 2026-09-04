@@ -1,0 +1,10 @@
+# Fichiers à exclure du build Docker (image plus légère, build plus rapide)
+node_modules
+dist
+.git
+*.md
+.env
+.env.*
+!.env.example
+test
+coverage
