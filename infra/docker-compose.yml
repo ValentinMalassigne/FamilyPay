@@ -19,33 +19,37 @@ services:
       timeout: 5s
       retries: 5
 
-  backend:
-    build:
-      context: ../backend
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      DATABASE_URL: ${DATABASE_URL}
-      JWT_SECRET: ${JWT_SECRET}
-      MISTRAL_API_KEY: ${MISTRAL_API_KEY}
-      BACKEND_PORT: ${BACKEND_PORT:-3000}
-    ports:
-      - "${BACKEND_PORT:-3000}:3000"
-
-  nextjs:
-    build:
-      context: ../web
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    depends_on:
-      - backend
-    environment:
-      NEXT_PUBLIC_GRAPHQL_URL: ${NEXT_PUBLIC_GRAPHQL_URL:-http://localhost:3000/graphql}
-    ports:
-      - "3001:3000"
+  # --- Services applicatifs (commentés tant que leur Dockerfile n'existe pas sur main) ---
+  # Le service backend sera ré-activé sur la branche backend (Dockerfile posé par feat/backend-init).
+  # Le service nextjs sera ré-activé sur la branche web.
+  #
+  # backend:
+  #   build:
+  #     context: ../backend
+  #     dockerfile: Dockerfile
+  #   restart: unless-stopped
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   environment:
+  #     DATABASE_URL: ${DATABASE_URL}
+  #     JWT_SECRET: ${JWT_SECRET}
+  #     MISTRAL_API_KEY: ${MISTRAL_API_KEY}
+  #     BACKEND_PORT: ${BACKEND_PORT:-3000}
+  #   ports:
+  #     - "${BACKEND_PORT:-3000}:3000"
+  #
+  # nextjs:
+  #   build:
+  #     context: ../web
+  #     dockerfile: Dockerfile
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - backend
+  #   environment:
+  #     NEXT_PUBLIC_GRAPHQL_URL: ${NEXT_PUBLIC_GRAPHQL_URL:-http://localhost:3000/graphql}
+  #   ports:
+  #     - "3001:3000"
 
   # Optionnel : pub/sub pour les subscriptions GraphQL (décommenter si besoin)
   # redis:
