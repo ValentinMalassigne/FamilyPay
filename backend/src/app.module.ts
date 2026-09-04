@@ -6,6 +6,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { HealthModule } from './health/health.module.js';
 import { UsersModule } from './users/users.module.js';
 import { AuthModule } from './auth/auth.module.js';
+import { TransactionsModule } from './transactions/transactions.module.js';
+import { PubSubModule } from './pubsub/pubsub.module.js';
 
 /*
  * AppModule : module racine de l'application NestJS.
@@ -41,10 +43,24 @@ import { AuthModule } from './auth/auth.module.js';
      *
      * ApolloDriverConfig est le type qui décrit les options acceptées par le driver Apollo.
      */
+    /*
+     * GraphQLModule : configure le serveur GraphQL Apollo avec support des subscriptions.
+     *
+     * En plus de la configuration de base (code-first, autoSchemaFile), on active
+     * les subscriptions via WebSocket. Apollo Server gère automatiquement le protocole
+     * GraphQL over WebSocket (GQL_WS) pour les subscriptions.
+     *
+     * - subscriptions: { 'graphql-ws': true } : active le support des subscriptions
+     *   via le protocole graphql-ws (standard pour GraphQL over WebSocket).
+     *   Cela permet aux clients de s'abonner à des événements en temps réel.
+     */
     GraphQLModule.forRoot<ApolloDriverConfig>({
       driver: ApolloDriver,
       autoSchemaFile: true,
       playground: true,
+      subscriptions: {
+        'graphql-ws': true,
+      },
     }),
 
     /*
@@ -79,6 +95,9 @@ import { AuthModule } from './auth/auth.module.js';
       }),
     }),
 
+    // PubSubModule : module global pour les subscriptions GraphQL (Pub/Sub in-memory).
+    PubSubModule,
+
     // HealthModule : endpoint GET /health pour le health-check (load balancer / orchestrateur cloud).
     HealthModule,
 
@@ -87,6 +106,9 @@ import { AuthModule } from './auth/auth.module.js';
 
     // AuthModule : login + signup, JWT, guards (GqlAuthGuard, RolesGuard).
     AuthModule,
+
+    // TransactionsModule : transactions, historique, recharge, dépenses + subscriptions.
+    TransactionsModule,
   ],
 })
 export class AppModule {}
