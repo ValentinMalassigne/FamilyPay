@@ -44,3 +44,38 @@ Pas besoin du niveau de détail demandé pour NestJS/GraphQL/PostgreSQL.
 Le mobile n'est pas conteneurisé (Flutter tourne sur émulateur/device). La
 config (URL du backend GraphQL) passe par variables d'environnement ou
 config de build — jamais en dur.
+
+## Commandes de dev
+
+### Lancer l'app sur le simulateur iOS
+
+`flutter run` est un processus long par conception (il garde l'app active
+et attend des hot-reloads). **Ne jamais l'exécuter directement dans le
+shell de l'agent** — il bloquerait indéfiniment la session.
+
+Pattern à suivre : détacher avec `nohup ... &`, rediriger la sortie vers
+un log, puis relire le log séparément.
+
+```bash
+# Détecter un simulateur booté
+xcrun simctl list devices booted
+
+# Lancer en arrière-plan (remplacer <device-id> par l'ID du simulateur booté)
+cd mobile
+nohup flutter run -d <device-id> > /tmp/familypay-flutter.log 2>&1 &
+
+# Suivre le build/lancement (Ctrl+C arrête seulement le tail, pas l'app)
+tail -f /tmp/familypay-flutter.log
+
+# Arrêter l'app plus tard
+pkill -f "flutter run"
+```
+
+### Vérifications rapides (sans lancer l'app)
+
+```bash
+cd mobile
+flutter pub get      # résoud les dépendances
+flutter analyze      # analyse statique (lint)
+flutter test         # tests unitaires/widget
+```
