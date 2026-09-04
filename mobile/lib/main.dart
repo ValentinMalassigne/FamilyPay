@@ -22,7 +22,6 @@ Future<void> main() async {
   // TokenStore partagé : détient le JWT de l'enfant connecté.
   // Le client GraphQL le lit via `tokenProvider` à chaque requête.
   final tokenStore = TokenStore();
-  final authService = AuthService(tokenStore);
 
   final graphqlUrl = dotenv.get('GRAPHQL_URL');
 
@@ -30,6 +29,9 @@ Future<void> main() async {
     graphqlUrl: graphqlUrl,
     tokenProvider: () async => tokenStore.token,
   );
+
+  // AuthService a besoin du client GraphQL pour appeler la mutation login.
+  final authService = AuthService(tokenStore, client.value);
 
   runApp(
     MultiProvider(
