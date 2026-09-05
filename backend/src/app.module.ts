@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { GraphQLModule } from '@nestjs/graphql';
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
@@ -8,6 +9,7 @@ import { UsersModule } from './users/users.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { TransactionsModule } from './transactions/transactions.module.js';
 import { PubSubModule } from './pubsub/pubsub.module.js';
+import { GqlAuthGuard } from './common/auth.guard.js';
 
 /*
  * AppModule : module racine de l'application NestJS.
@@ -109,6 +111,21 @@ import { PubSubModule } from './pubsub/pubsub.module.js';
 
     // TransactionsModule : transactions, historique, recharge, dépenses + subscriptions.
     TransactionsModule,
+  ],
+  /*
+   * providers (global) :
+   * - APP_GUARD with GqlAuthGuard : enregistre GqlAuthGuard comme guard GLOBAL.
+   *   NestJS applique ce guard à TOUS les resolvers de l'application avant
+   *   d'exécuter le handler. C'est l'approche "secure by default" (§8) :
+   *   l'authentification est active par défaut, et on ouvre des exceptions
+   *   ciblées via @Public() (signup, login, et plus tard contributeToPotPublic).
+   *   Sans ça, un nouveau resolver qui oublie @UseGuards serait ouvert sans auth.
+   */
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: GqlAuthGuard,
+    },
   ],
 })
 export class AppModule {}

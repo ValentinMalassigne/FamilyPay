@@ -2,7 +2,6 @@ import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service.js';
 import { User, Role } from './entities/user.entity.js';
-import { GqlAuthGuard } from '../common/auth.guard.js';
 import { RolesGuard } from '../common/roles.guard.js';
 import { Roles } from '../common/roles.decorator.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
@@ -15,6 +14,11 @@ import type { JwtPayload } from '../common/types.js';
  * Le () => User indique que ce resolver gère les field resolvers du type User
  * (ici il n'y en a pas, mais c'est aussi utilisé pour les query/mutation
  * qui retournent des User).
+ *
+ * Authentification : GqlAuthGuard est registered globallement via APP_GUARD
+ * dans AppModule → tous les resolvers exigent un JWT valide par défaut, sans
+ * besoin de @UseGuards(GqlAuthGuard) sur chaque méthode. Les exceptions
+ * publiques sont marquées @Public() (voir AuthResolver).
  */
 @Resolver(() => User)
 export class UsersResolver {
@@ -23,8 +27,8 @@ export class UsersResolver {
   /*
    * Query me : retourne l'utilisateur courant (authentifié via JWT).
    *
-   * @UseGuards(GqlAuthGuard) : exige un JWT valide. Le guard vérifie le token
-   * et pose le payload dans req.user (accessible via @CurrentUser()).
+   * Pas de @UseGuards ici : GqlAuthGuard (global via APP_GUARD) vérifie déjà
+   * le JWT et pose le payload dans req.user (accessible via @CurrentUser()).
    *
    * @CurrentUser() user : extrait le payload JWT (JwtPayload) du contexte.
    * On a l'ID (sub), on charge l'utilisateur complet depuis la DB.
@@ -32,7 +36,6 @@ export class UsersResolver {
    * Schéma généré : me: User!
    */
   @Query(() => User)
-  @UseGuards(GqlAuthGuard)
   async me(@CurrentUser() user: JwtPayload): Promise<User> {
     const fullUser = await this.usersService.findById(user.sub);
     if (!fullUser) {
@@ -44,9 +47,9 @@ export class UsersResolver {
   /*
    * Mutation createChildAccount : un parent crée un compte enfant.
    *
-   * @UseGuards(GqlAuthGuard, RolesGuard) :
-   *   1. GqlAuthGuard vérifie le JWT et pose req.user.
-   *   2. RolesGuard vérifie que req.user.role est dans @Roles(...).
+   * @UseGuards(RolesGuard) : GqlAuthGuard est global (APP_GUARD), on n'a plus
+   * besoin de le lister. On garde RolesGuard pour vérifier @Roles(Role.PARENT).
+   * NestJS exécute d'abord le guard global (GqlAuthGuard), puis RolesGuard.
    *
    * @Roles(Role.PARENT) : seul un parent peut créer un compte enfant.
    *
@@ -54,7 +57,7 @@ export class UsersResolver {
    * createdByUserId = l'ID du parent créateur (user.sub).
    */
   @Mutation(() => User)
-  @UseGuards(GqlAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles(Role.PARENT)
   async createChildAccount(
     @CurrentUser() creator: JwtPayload,
@@ -80,7 +83,7 @@ export class UsersResolver {
    * Pas de ChildAccount créé (seuls les enfants ont un solde).
    */
   @Mutation(() => User)
-  @UseGuards(GqlAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles(Role.PARENT)
   async createParentAccount(
     @CurrentUser() creator: JwtPayload,
