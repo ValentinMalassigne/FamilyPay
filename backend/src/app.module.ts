@@ -8,6 +8,7 @@ import { HealthModule } from './health/health.module.js';
 import { UsersModule } from './users/users.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { TransactionsModule } from './transactions/transactions.module.js';
+import { PotsModule } from './pots/pots.module.js';
 import { PubSubModule } from './pubsub/pubsub.module.js';
 import { CommonModule } from './common/common.module.js';
 import { GqlAuthGuard } from './common/auth.guard.js';
@@ -117,6 +118,9 @@ import { GqlAuthGuard } from './common/auth.guard.js';
 
     // TransactionsModule : transactions, historique, recharge, dépenses + subscriptions.
     TransactionsModule,
+
+    // PotsModule : cagnottes (Pot) + contributions publiques + retraits selon policy.
+    PotsModule,
   ],
   /*
    * providers (global) :
