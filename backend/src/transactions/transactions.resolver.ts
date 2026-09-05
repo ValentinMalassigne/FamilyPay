@@ -113,7 +113,7 @@ export class TransactionsResolver {
     @Args('childId') childId: string,
     @Args('amount') amount: number,
     @Args('label') label: string,
-    @Args('category') category?: string,
+    @Args('category', { nullable: true }) category?: string,
   ): Promise<Transaction> {
     return this.transactionsService.addManualExpense({
       childId,
