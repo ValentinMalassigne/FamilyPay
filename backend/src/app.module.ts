@@ -10,6 +10,8 @@ import { AuthModule } from './auth/auth.module.js';
 import { TransactionsModule } from './transactions/transactions.module.js';
 import { PotsModule } from './pots/pots.module.js';
 import { MissionsModule } from './missions/missions.module.js';
+import { AllowancesModule } from './allowances/allowances.module.js';
+import { ScheduleModule } from '@nestjs/schedule';
 import { PubSubModule } from './pubsub/pubsub.module.js';
 import { CommonModule } from './common/common.module.js';
 import { GqlAuthGuard } from './common/auth.guard.js';
@@ -125,6 +127,13 @@ import { GqlAuthGuard } from './common/auth.guard.js';
 
     // MissionsModule : missions rémunérées (cycle PENDING → DONE_BY_CHILD → VALIDATED/REJECTED).
     MissionsModule,
+
+    // AllowancesModule : virements automatiques récurrents + cron @Cron.
+    AllowancesModule,
+
+    // ScheduleModule : active le support des décorateurs @Cron/@Interval/@Timeout
+    // de @nestjs/schedule. Nécessaire pour le cron processDueAllowances.
+    ScheduleModule.forRoot(),
   ],
   /*
    * providers (global) :
