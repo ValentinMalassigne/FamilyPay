@@ -210,3 +210,54 @@ export const CONTRIBUTE_TO_POT_PUBLIC_MUTATION = /* GraphQL */ `
     }
   }
 `;
+
+// Type MissionStatus : cycle de vie d'une mission (enum backend).
+export type MissionStatus =
+  | 'PENDING'
+  | 'DONE_BY_CHILD'
+  | 'VALIDATED'
+  | 'REJECTED';
+
+export type Mission = {
+  id: string;
+  title: string;
+  reward: number;
+  status: MissionStatus;
+};
+
+// Query missions : liste les missions d'un enfant.
+export const MISSIONS_QUERY = /* GraphQL */ `
+  query Missions($childId: ID!) {
+    missions(childId: $childId) {
+      id
+      title
+      reward
+      status
+    }
+  }
+`;
+
+// Mutation createMission : un parent crée une mission pour un enfant.
+export const CREATE_MISSION_MUTATION = /* GraphQL */ `
+  mutation CreateMission($childId: ID!, $title: String!, $reward: Float!) {
+    createMission(childId: $childId, title: $title, reward: $reward) {
+      id
+      title
+      reward
+      status
+    }
+  }
+`;
+
+// Mutation validateMission : un parent valide (approve=true) ou refuse
+// (approve=false) une mission marquée faite par l'enfant (DONE_BY_CHILD).
+export const VALIDATE_MISSION_MUTATION = /* GraphQL */ `
+  mutation ValidateMission($missionId: ID!, $approve: Boolean!) {
+    validateMission(missionId: $missionId, approve: $approve) {
+      id
+      title
+      reward
+      status
+    }
+  }
+`;
