@@ -261,3 +261,22 @@ export const VALIDATE_MISSION_MUTATION = /* GraphQL */ `
     }
   }
 `;
+
+// Mutation setCardBlocked : bloque (blocked=true) ou débloque (blocked=false)
+// la carte d'un enfant. Un parent est toujours autorisé. Retourne le
+// ChildAccount mis à jour (blocked, blockedBy).
+export const SET_CARD_BLOCKED_MUTATION = /* GraphQL */ `
+  mutation SetCardBlocked($childId: ID!, $blocked: Boolean!) {
+    setCardBlocked(childId: $childId, blocked: $blocked) {
+      id
+      balance
+      blocked
+      blockedBy
+      user {
+        id
+        firstName
+        lastName
+      }
+    }
+  }
+`;
