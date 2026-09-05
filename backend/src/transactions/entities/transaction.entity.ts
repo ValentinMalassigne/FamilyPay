@@ -83,18 +83,21 @@ export class Transaction {
    * clé étrangère vers user.id.
    * lazy: true → chargement paresseux de la relation.
    *
-   * @Field(() => User) : expose le user dans le schéma GraphQL.
+   * Pas de @Field : la relation n'est pas exposée en GraphQL. Le schéma §6
+   * expose childId (l'ID brut) plutôt que l'objet User complet, pour rester
+   * aligné avec le contrat partagé avec web/mobile. La relation TypeORM
+   * reste disponible côté service pour les jointures si besoin.
    */
-  @Field(() => User)
   @ManyToOne(() => User, { lazy: true })
   @JoinColumn({ name: 'childId' })
   child: Promise<User>;
 
   /*
    * childId : colonne stockant l'ID de l'enfant (User avec role=CHILD).
-   * Non exposé en GraphQL car redondant avec child (le resolver peut charger
-   * le user complet si le client demande child { id }).
+   * @Field(() => ID) : exposé en GraphQL avec le type ID (conforme au schéma §6,
+   * qui liste childId implicitement via la mutation addManualExpense(childId: ID!)).
    */
+  @Field(() => ID)
   @Column({ type: 'uuid' })
   childId: string;
 
