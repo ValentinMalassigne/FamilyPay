@@ -27,7 +27,9 @@ export async function POST(request: Request) {
     );
   }
 
-  type LoginData = { login: { token: string } };
+  // On récupère le role depuis la réponse du backend pour orienter la
+  // redirection côté client (un enfant ne va pas sur /parent mais sur /child).
+  type LoginData = { login: { token: string; user: { role: 'PARENT' | 'CHILD' } } };
   const result = await serverGraphQL<LoginData>(LOGIN_MUTATION, { email, password });
 
   if (result.errors || !result.data?.login?.token) {
@@ -36,11 +38,12 @@ export async function POST(request: Request) {
   }
 
   const token = result.data.login.token;
+  const role = result.data.login.user.role;
 
   // Pose le cookie httpOnly. SameSite=Lax protège contre CSRF pour les
   // requêtes cross-site simples. secure=false en dev (HTTP) ; en production
   // (HTTPS) il faudrait secure=true via une variable d'env.
-  const response = NextResponse.json({ ok: true });
+  const response = NextResponse.json({ ok: true, role });
   response.cookies.set(AUTH_COOKIE, token, {
     httpOnly: true,
     sameSite: 'lax',
