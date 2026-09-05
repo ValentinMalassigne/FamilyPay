@@ -64,8 +64,10 @@ export class AuthService {
   /*
    * signup : cree la Family + le premier parent, puis signe le JWT.
    *
-   * Delegue la creation a UsersService.signup, puis signe le JWT comme login.
-   * La difference avec login : signup cree le compte avant de signer.
+   * Delegue la creation a UsersService.signup (qui retourne le User), puis
+   * signe le JWT comme login. La difference avec login : signup cree le
+   * compte avant de signer. La signature du JWT reste la responsabilité
+   * d'AuthService (UsersService ne manipule jamais le JWT).
    */
   async signup(params: {
     firstName: string;
@@ -74,7 +76,7 @@ export class AuthService {
     password: string;
     familyName: string;
   }) {
-    const { user } = await this.usersService.signup(params);
+    const user = await this.usersService.signup(params);
 
     const payload: JwtPayload = {
       sub: user.id,

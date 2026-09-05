@@ -1,5 +1,5 @@
 import { Args, Mutation, Query, Resolver, Subscription } from '@nestjs/graphql';
-import { UseGuards, Inject } from '@nestjs/common';
+import { UseGuards, Inject, ForbiddenException } from '@nestjs/common';
 import { TransactionsService } from './transactions.service.js';
 import { Transaction } from './entities/transaction.entity.js';
 import { ChildAccount } from '../users/entities/child-account.entity.js';
@@ -7,6 +7,7 @@ import { RolesGuard } from '../common/roles.guard.js';
 import { Roles } from '../common/roles.decorator.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { Role } from '../users/entities/user.entity.js';
+import { UsersService } from '../users/users.service.js';
 import type { JwtPayload } from '../common/types.js';
 import { PubSub } from 'graphql-subscriptions';
 
@@ -32,6 +33,7 @@ import { PubSub } from 'graphql-subscriptions';
 export class TransactionsResolver {
   constructor(
     private transactionsService: TransactionsService,
+    private usersService: UsersService,
     @Inject('PUB_SUB') private pubSub: PubSub,
   ) {}
 
@@ -65,18 +67,16 @@ export class TransactionsResolver {
     const isParent = user.role === Role.PARENT;
 
     if (!isSameUser && !isParent) {
-      throw new Error(
+      throw new ForbiddenException(
         `Seul un parent ou l'enfant lui-même peut voir ces transactions`,
       );
     }
 
     // Si c'est un parent, vérifier que l'enfant fait partie de sa famille.
     if (isParent && !isSameUser) {
-      const child = await this.transactionsService['usersService'].findById(
-        childId,
-      );
+      const child = await this.usersService.findById(childId);
       if (!child || child.familyId !== user.familyId) {
-        throw new Error(
+        throw new ForbiddenException(
           `Vous n'avez pas le droit de voir les transactions de cet enfant`,
         );
       }
