@@ -1,19 +1,23 @@
 import { ApolloClient, HttpLink, InMemoryCache } from '@apollo/client';
 
-// Création du client Apollo unique pour l'app web.
+// Client Apollo unique pour l'app web (côté navigateur).
 //
-// L'URI du endpoint GraphQL est lue depuis la variable d'environnement publique
-// NEXT_PUBLIC_GRAPHQL_URL (préfixe NEXT_PUBLIC_ → exposée au navigateur par Next.js).
-// En dev local : http://localhost:3000/graphql (voir .env.example).
+// Le client pointe vers le proxy Next.js /api/graphql (URL relative, même
+// origine que le front) plutôt que vers le backend directement. Le proxy lit
+// le JWT dans le cookie httpOnly et injecte l'Authorization header vers le
+// backend — le navigateur n'a donc jamais à manipuler le token (sécurité XSS).
 //
-// HttpLink : link de transport HTTP qui envoie les opérations GraphQL au backend
-// par POST. Depuis Apollo Client 4, le raccourci `uri` sur ApolloClient est
-// supprimé → on passe un HttpLink explicite (déjà le cas depuis la v3.14).
+// HttpLink : link de transport HTTP qui envoie les opérations GraphQL par POST.
+// Depuis Apollo Client 4, le raccourci `uri` sur ApolloClient est supprimé → on
+// passe un HttpLink explicite.
 //
-// InMemoryCache : cache côté client normalisé des résultats GraphQL. Pour cette
-// init on garde la config par défaut ; on l'enrichira quand on aura des queries
-// réelles (normalisation par __typename + id).
+// InMemoryCache : cache côté client normalisé des résultats GraphQL. Pour
+// cette init on garde la config par défaut ; on l'enrichira quand on aura des
+// queries réelles (normalisation par __typename + id).
+//
+// Note : les subscriptions temps réel (WebSocket) ne passent pas par ce
+// HttpLink — elles nécessiteront un link WS dédié dans une branche ultérieure.
 export const apolloClient = new ApolloClient({
-  link: new HttpLink({ uri: process.env.NEXT_PUBLIC_GRAPHQL_URL }),
+  link: new HttpLink({ uri: '/api/graphql' }),
   cache: new InMemoryCache(),
 });
