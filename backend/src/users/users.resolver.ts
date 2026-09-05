@@ -89,6 +89,36 @@ export class UsersResolver {
   }
 
   /*
+   * Query myChildren : retourne la liste des comptes enfants de la famille
+   * du parent authentifié (solde, état de blocage, et user chargé).
+   *
+   * Évolution du schéma §6 (non listée dans l'esquisse) : l'espace parent a
+   * besoin de lister ses enfants pour afficher le dashboard. C'est une
+   * évolution backend autorisée (PR backend d'abord).
+   *
+   * Schéma généré : myChildren: [ChildAccount!]!
+   *
+   * Guards :
+   * - GqlAuthGuard (global via APP_GUARD) vérifie le JWT au préalable et
+   *   place le payload dans le contexte.
+   * - @UseGuards(RolesGuard) + @Roles(Role.PARENT) : seul un PARENT peut
+   *   lister les enfants d'une famille. Un enfant n'a pas accès à cette
+   *   query (il ne voit que son propre compte).
+   *
+   * Filtrage par famille : on passe user.familyId (issu du JWT) au service.
+   * Un parent ne peut ainsi voir QUE les enfants de SA famille — pas besoin
+   * de vérification supplémentaire, le filtre SQL est fait en base.
+   *
+   * @CurrentUser() user : payload JWT du parent (contient familyId).
+   */
+  @Query(() => [ChildAccount])
+  @UseGuards(RolesGuard)
+  @Roles(Role.PARENT)
+  async myChildren(@CurrentUser() user: JwtPayload): Promise<ChildAccount[]> {
+    return this.usersService.findChildrenByFamilyId(user.familyId);
+  }
+
+  /*
    * Mutation createChildAccount : un parent crée un compte enfant.
    *
    * @UseGuards(RolesGuard) : GqlAuthGuard est global (APP_GUARD), on n'a plus

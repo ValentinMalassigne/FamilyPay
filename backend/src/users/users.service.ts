@@ -62,6 +62,30 @@ export class UsersService {
   }
 
   /*
+   * findChildrenByFamilyId : retourne tous les ChildAccount des enfants
+   * appartenant à une famille donnée, avec leur User chargé.
+   *
+   * Utilisé par la query myChildren : un parent demande la liste de ses
+   * enfants (solde, état de blocage) pour afficher son dashboard.
+   *
+   * Requête TypeORM : on filtre sur child_account via la relation user.
+   * - where: { user: { familyId, role: Role.CHILD } } : TypeORM génère une
+   *   jointure implicite vers la table "user" et filtre sur les User dont
+   *   familyId correspond ET role = CHILD. Cela garantit qu'on ne récupère
+   *   que les comptes des enfants (et pas un éventuel second parent de la
+   *   famille, qui n'a pas de ChildAccount de toute façon).
+   * - relations: { user: true } : charge eagerly le User associé à chaque
+   *   ChildAccount pour éviter un second round-trip DB quand le client
+   *   GraphQL demande `user { firstName lastName email }`.
+   */
+  async findChildrenByFamilyId(familyId: string): Promise<ChildAccount[]> {
+    return this.childAccountRepository.find({
+      where: { user: { familyId, role: Role.CHILD } },
+      relations: { user: true },
+    });
+  }
+
+  /*
    * signup : crée la première Family + le premier User (role=PARENT).
    *
    * Flux (PROJECT_CONTEXT.md §4) : pas d'invitation par code. Le premier
