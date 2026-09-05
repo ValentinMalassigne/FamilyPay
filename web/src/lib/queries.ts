@@ -126,3 +126,87 @@ export const ADD_MANUAL_EXPENSE_MUTATION = /* GraphQL */ `
     }
   }
 `;
+
+// Type WithdrawalPolicy : politique de retrait d'une cagnotte (enum backend).
+export type WithdrawalPolicy = 'ANYTIME' | 'WHEN_FULL' | 'PARENT_ONLY';
+
+export type Pot = {
+  id: string;
+  title: string;
+  targetAmount: number;
+  currentAmount: number;
+  publicToken: string;
+  hiddenFrom: string[];
+  withdrawalPolicy: WithdrawalPolicy;
+};
+
+// Query pots : liste les cagnottes d'un enfant.
+export const POTS_QUERY = /* GraphQL */ `
+  query Pots($childId: ID!) {
+    pots(childId: $childId) {
+      id
+      title
+      targetAmount
+      currentAmount
+      publicToken
+      hiddenFrom
+      withdrawalPolicy
+    }
+  }
+`;
+
+// Mutation createPot : un parent crée une cagnotte.
+export const CREATE_POT_MUTATION = /* GraphQL */ `
+  mutation CreatePot(
+    $childId: ID!
+    $title: String!
+    $targetAmount: Float!
+    $withdrawalPolicy: WithdrawalPolicy!
+  ) {
+    createPot(
+      childId: $childId
+      title: $title
+      targetAmount: $targetAmount
+      withdrawalPolicy: $withdrawalPolicy
+    ) {
+      id
+      title
+      targetAmount
+      currentAmount
+      publicToken
+      withdrawalPolicy
+    }
+  }
+`;
+
+// Mutation withdrawFromPot : retire d'une cagnotte (parent toujours autorisé).
+export const WITHDRAW_FROM_POT_MUTATION = /* GraphQL */ `
+  mutation WithdrawFromPot($potId: ID!, $amount: Float!) {
+    withdrawFromPot(potId: $potId, amount: $amount) {
+      id
+      amount
+      type
+      createdAt
+    }
+  }
+`;
+
+// Mutation contributeToPotPublic : don public SANS auth (@Public côté backend).
+// Appelée depuis la page /donate/[token] via le proxy /api/graphql sans JWT.
+export const CONTRIBUTE_TO_POT_PUBLIC_MUTATION = /* GraphQL */ `
+  mutation ContributeToPotPublic(
+    $publicToken: String!
+    $amount: Float!
+    $contributorName: String
+  ) {
+    contributeToPotPublic(
+      publicToken: $publicToken
+      amount: $amount
+      contributorName: $contributorName
+    ) {
+      id
+      amount
+      contributorName
+    }
+  }
+`;
