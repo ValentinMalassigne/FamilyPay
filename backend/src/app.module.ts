@@ -9,6 +9,7 @@ import { UsersModule } from './users/users.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { TransactionsModule } from './transactions/transactions.module.js';
 import { PubSubModule } from './pubsub/pubsub.module.js';
+import { CommonModule } from './common/common.module.js';
 import { GqlAuthGuard } from './common/auth.guard.js';
 
 /*
@@ -99,6 +100,11 @@ import { GqlAuthGuard } from './common/auth.guard.js';
 
     // PubSubModule : module global pour les subscriptions GraphQL (Pub/Sub in-memory).
     PubSubModule,
+
+    // CommonModule : fournit JwtModule (JwtService) pour GqlAuthGuard (global).
+    // Nécessaire ici car GqlAuthGuard est instancié dans le contexte d'AppModule
+    // via APP_GUARD — sans cet import, JwtService ne serait pas résolu.
+    CommonModule,
 
     // HealthModule : endpoint GET /health pour le health-check (load balancer / orchestrateur cloud).
     HealthModule,
