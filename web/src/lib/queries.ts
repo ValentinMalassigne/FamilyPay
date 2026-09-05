@@ -280,3 +280,49 @@ export const SET_CARD_BLOCKED_MUTATION = /* GraphQL */ `
     }
   }
 `;
+
+// Type AllowanceFrequency : fréquence du virement automatique (enum backend).
+export type AllowanceFrequency = 'WEEKLY' | 'MONTHLY';
+
+export type AllowanceRule = {
+  id: string;
+  childId: string;
+  amount: number;
+  frequency: AllowanceFrequency;
+  active: boolean;
+};
+
+// Query allowanceRules : liste les règles de virement d'un enfant.
+// nextRunAt n'est pas exposé en GraphQL (champ technique géré par le cron).
+export const ALLOWANCE_RULES_QUERY = /* GraphQL */ `
+  query AllowanceRules($childId: ID!) {
+    allowanceRules(childId: $childId) {
+      id
+      childId
+      amount
+      frequency
+      active
+    }
+  }
+`;
+
+// Mutation createAllowanceRule : un parent crée un virement automatique.
+export const CREATE_ALLOWANCE_RULE_MUTATION = /* GraphQL */ `
+  mutation CreateAllowanceRule(
+    $childId: ID!
+    $amount: Float!
+    $frequency: AllowanceFrequency!
+  ) {
+    createAllowanceRule(
+      childId: $childId
+      amount: $amount
+      frequency: $frequency
+    ) {
+      id
+      childId
+      amount
+      frequency
+      active
+    }
+  }
+`;
