@@ -130,11 +130,13 @@ type ChildAccount {
 
 type Transaction {
   id: ID!
+  childId: ID!
   amount: Float!
   type: TransactionType!
   label: String
   category: String
   createdAt: DateTime!
+  createdBy: CreatedBy!
 }
 
 type Pot {
