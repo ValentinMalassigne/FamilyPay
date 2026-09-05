@@ -55,6 +55,7 @@ export default async function ChildDetailPage({
     { href: 'pots', label: 'Cagnottes' },
     { href: 'missions', label: 'Missions' },
     { href: 'allowances', label: 'Virements automatiques' },
+    { href: 'card', label: 'Carte (blocage)' },
   ];
 
   return (
