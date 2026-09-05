@@ -9,6 +9,7 @@ import { UsersModule } from './users/users.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { TransactionsModule } from './transactions/transactions.module.js';
 import { PotsModule } from './pots/pots.module.js';
+import { MissionsModule } from './missions/missions.module.js';
 import { PubSubModule } from './pubsub/pubsub.module.js';
 import { CommonModule } from './common/common.module.js';
 import { GqlAuthGuard } from './common/auth.guard.js';
@@ -121,6 +122,9 @@ import { GqlAuthGuard } from './common/auth.guard.js';
 
     // PotsModule : cagnottes (Pot) + contributions publiques + retraits selon policy.
     PotsModule,
+
+    // MissionsModule : missions rémunérées (cycle PENDING → DONE_BY_CHILD → VALIDATED/REJECTED).
+    MissionsModule,
   ],
   /*
    * providers (global) :
