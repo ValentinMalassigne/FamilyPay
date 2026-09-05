@@ -4,12 +4,15 @@ import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
-// Page de connexion parent (POST /api/auth/login).
+// Page de connexion (POST /api/auth/login).
 //
 // Formulaire client qui poste les identifiants au Route Handler server-side.
 // Le Route Handler appelle la mutation `login` du backend et pose le JWT dans
-// un cookie httpOnly, puis on redirige vers /parent. Le token n'est jamais
-// manipulé côté navigateur.
+// un cookie httpOnly, puis renvoie le rôle (PARENT | CHILD). On redirige :
+//  - PARENT → /parent (espace parent) ;
+//  - CHILD  → /child (page de fallback : l'enfant n'a pas d'interface web,
+//    son parcours est sur l'application mobile).
+// Le token n'est jamais manipulé côté navigateur.
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -35,8 +38,14 @@ export default function LoginPage() {
         return;
       }
 
-      router.push('/parent');
-      router.refresh();
+      const data = await res.json();
+      if (data.role === 'CHILD') {
+        router.push('/child');
+        router.refresh();
+      } else {
+        router.push('/parent');
+        router.refresh();
+      }
     } catch {
       setError('Erreur réseau, réessaie plus tard');
     } finally {
