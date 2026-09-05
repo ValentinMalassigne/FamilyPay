@@ -39,7 +39,9 @@ Débutant sur NestJS / GraphQL / PostgreSQL → commenter systématiquement :
 ## Règles métier à respecter scrupuleusement
 
 - **Solde** : `ChildAccount.balance` est stocké et mis à jour à chaque
-  transaction, jamais recalculé à la volée.
+  transaction, jamais recalculé à la volée. Le solde ne peut **jamais** passer
+  en négatif — tout débit qui ferait passer le solde sous 0 est rejeté
+  (`BadRequestException`) avant la mise à jour.
 - **Blocage de carte** : `blockedBy` détermine la priorité. Si `PARENT`,
   seul un parent peut débloquer. Si `CHILD` ou null, l'enfant peut
   bloquer/débloquer. Un parent peut toujours bloquer/débloquer.

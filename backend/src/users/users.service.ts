@@ -51,6 +51,17 @@ export class UsersService {
   }
 
   /*
+   * findChildAccountByUserId : recherche le ChildAccount d'un enfant par son
+   * userId (l'ID du User role=CHILD). Retourne null si non trouvé.
+   *
+   * Utilisé par la query childAccount(childId) : childId est l'ID du User enfant,
+   * et ChildAccount.userId pointe vers ce User (relation OneToOne).
+   */
+  async findChildAccountByUserId(userId: string): Promise<ChildAccount | null> {
+    return this.childAccountRepository.findOne({ where: { userId } });
+  }
+
+  /*
    * signup : crée la première Family + le premier User (role=PARENT).
    *
    * Flux (PROJECT_CONTEXT.md §4) : pas d'invitation par code. Le premier
@@ -64,6 +75,10 @@ export class UsersService {
    *  3. Créer la Family.
    *  4. Créer le User (role=PARENT, familyId=family.id, createdByUserId=null).
    *
+   * Retourne le User créé (sans token). La signature du JWT est la
+   * responsabilité d'AuthService, pas de UsersService (séparation des
+   * responsabilités : UsersService gère la DB, AuthService gère le JWT).
+   *
    * bcrypt.hash(password, 10) : 10 = nombre de rounds (cost factor). Plus c'est
    * élevé, plus c'est lent (donc résistant au brute-force) mais coûteux CPU.
    * 10 est la valeur standard.
@@ -74,7 +89,7 @@ export class UsersService {
     email: string;
     password: string;
     familyName: string;
-  }): Promise<{ user: User; token: string }> {
+  }): Promise<User> {
     const existing = await this.findByEmail(params.email);
     if (existing) {
       throw new ConflictException('Un compte existe déjà avec cet email');
@@ -95,9 +110,7 @@ export class UsersService {
       familyId: savedFamily.id,
       createdByUserId: null,
     });
-    const savedUser = await this.userRepository.save(user);
-
-    return { user: savedUser, token: '' };
+    return this.userRepository.save(user);
   }
 
   /*

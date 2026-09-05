@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Transaction } from './entities/transaction.entity.js';
+import { ChildAccount } from '../users/entities/child-account.entity.js';
 import { TransactionsService } from './transactions.service.js';
 import { TransactionsResolver } from './transactions.resolver.js';
 import { UsersModule } from '../users/users.module.js';
@@ -11,9 +12,15 @@ import { CommonModule } from '../common/common.module.js';
  * resolvers/services.
  *
  * imports:
- * - TypeOrmModule.forFeature([Transaction]) : enregistre le repository pour
- *   l'entité Transaction dans le scope de ce module. Repository<Transaction>
- *   devient injectable dans TransactionsService via @InjectRepository().
+ * - TypeOrmModule.forFeature([Transaction, ChildAccount]) : enregistre les
+ *   repositories pour les entités Transaction et ChildAccount dans le scope de
+ *   ce module. Repository<Transaction> et Repository<ChildAccount> deviennent
+ *   injectables dans TransactionsService via @InjectRepository().
+ *   ChildAccount est nécessaire car TransactionsService met à jour le solde
+ *   (balance) du ChildAccount à chaque transaction. On l'enregistre ici en
+ *   plus de UsersModule : un repository TypeORM doit être déclaré dans chaque
+ *   module qui l'injecte (UsersModule n'exporte que UsersService, pas le
+ *   repository).
  * - UsersModule : fournit UsersService (pour vérifier l'appartenance famille
  *   et charger les utilisateurs).
  * - CommonModule : fournit GqlAuthGuard et RolesGuard (pour les mutations
@@ -29,7 +36,7 @@ import { CommonModule } from '../common/common.module.js';
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Transaction]),
+    TypeOrmModule.forFeature([Transaction, ChildAccount]),
     UsersModule,
     CommonModule,
   ],

@@ -1,13 +1,13 @@
 import { Args, Mutation, Query, Resolver, Subscription } from '@nestjs/graphql';
-import { UseGuards, Inject } from '@nestjs/common';
+import { UseGuards, Inject, ForbiddenException } from '@nestjs/common';
 import { TransactionsService } from './transactions.service.js';
 import { Transaction } from './entities/transaction.entity.js';
 import { ChildAccount } from '../users/entities/child-account.entity.js';
-import { GqlAuthGuard } from '../common/auth.guard.js';
 import { RolesGuard } from '../common/roles.guard.js';
 import { Roles } from '../common/roles.decorator.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { Role } from '../users/entities/user.entity.js';
+import { UsersService } from '../users/users.service.js';
 import type { JwtPayload } from '../common/types.js';
 import { PubSub } from 'graphql-subscriptions';
 
@@ -18,6 +18,12 @@ import { PubSub } from 'graphql-subscriptions';
  * Cela permet de définir des field resolvers pour Transaction (si besoin) et
  * d'associer les queries/mutations/subscriptions qui retournent des Transaction.
  *
+ * Authentification : GqlAuthGuard est global (APP_GUARD dans AppModule) → tous
+ * les resolvers exigent un JWT valide par défaut. On n'a plus besoin de
+ * @UseGuards(GqlAuthGuard) sur chaque méthode. RolesGuard reste appliqué
+ * ponctuellement via @UseGuards(RolesGuard) + @Roles(...) pour les mutations
+ * restreintes par rôle.
+ *
  * Les resolvers ici gèrent :
  * - Query : transactions (historique des transactions d'un enfant)
  * - Mutations : addManualExpense, rechargeChildAccount
@@ -27,6 +33,7 @@ import { PubSub } from 'graphql-subscriptions';
 export class TransactionsResolver {
   constructor(
     private transactionsService: TransactionsService,
+    private usersService: UsersService,
     @Inject('PUB_SUB') private pubSub: PubSub,
   ) {}
 
@@ -37,8 +44,7 @@ export class TransactionsResolver {
    * de Transaction. Le schéma généré contiendra :
    *   transactions(childId: ID!): [Transaction!]!
    *
-   * @UseGuards(GqlAuthGuard) : exige un JWT valide (l'utilisateur doit être
-   * authentifié).
+   * GqlAuthGuard est global (APP_GUARD) → JWT vérifié automatiquement.
    *
    * @Args('childId') childId : ID de l'enfant dont on veut l'historique.
    * @CurrentUser() user : payload JWT de l'utilisateur actuel.
@@ -50,7 +56,6 @@ export class TransactionsResolver {
    * @throws ForbiddenException si l'utilisateur n'a pas le droit de voir ces transactions.
    */
   @Query(() => [Transaction])
-  @UseGuards(GqlAuthGuard)
   async transactions(
     @CurrentUser() user: JwtPayload,
     @Args('childId') childId: string,
@@ -62,18 +67,16 @@ export class TransactionsResolver {
     const isParent = user.role === Role.PARENT;
 
     if (!isSameUser && !isParent) {
-      throw new Error(
+      throw new ForbiddenException(
         `Seul un parent ou l'enfant lui-même peut voir ces transactions`,
       );
     }
 
     // Si c'est un parent, vérifier que l'enfant fait partie de sa famille.
     if (isParent && !isSameUser) {
-      const child = await this.transactionsService['usersService'].findById(
-        childId,
-      );
+      const child = await this.usersService.findById(childId);
       if (!child || child.familyId !== user.familyId) {
-        throw new Error(
+        throw new ForbiddenException(
           `Vous n'avez pas le droit de voir les transactions de cet enfant`,
         );
       }
@@ -87,12 +90,13 @@ export class TransactionsResolver {
    *
    * @Mutation(() => Transaction) : déclare une mutation GraphQL qui retourne
    * une Transaction. Le schéma généré contiendra :
-   *   addManualExpense(amount: Float!, label: String!, category: String): Transaction!
+   *   addManualExpense(childId: ID!, amount: Float!, label: String!, category: String): Transaction!
    *
-   * @UseGuards(GqlAuthGuard) : exige un JWT valide.
+   * GqlAuthGuard est global (APP_GUARD) → JWT vérifié automatiquement.
    *
+   * @Args('childId') childId : ID de l'enfant pour qui on ajoute la dépense.
    * @Args('amount') amount : montant de la dépense (positif, ex: 10 pour 10€).
-   *   Serait converti en négatif dans le service.
+   *   Sera converti en négatif dans le service.
    * @Args('label') label : libellé de la dépense (ex: "Dépense chez McDo").
    * @Args('category') category : catégorie optionnelle (ex: "Fast-food").
    * @CurrentUser() user : payload JWT de l'utilisateur actuel.
@@ -104,18 +108,15 @@ export class TransactionsResolver {
    * @throws ForbiddenException si l'utilisateur n'a pas le droit.
    */
   @Mutation(() => Transaction)
-  @UseGuards(GqlAuthGuard)
   async addManualExpense(
     @CurrentUser() user: JwtPayload,
+    @Args('childId') childId: string,
     @Args('amount') amount: number,
     @Args('label') label: string,
-    @Args('category') category?: string,
+    @Args('category', { nullable: true }) category?: string,
   ): Promise<Transaction> {
-    // Par défaut, l'enfant ajoute une dépense pour lui-même.
-    // Un parent peut spécifier childId via un autre argument si besoin,
-    // mais pour cette version, on utilise user.sub comme childId.
     return this.transactionsService.addManualExpense({
-      childId: user.sub,
+      childId,
       amount,
       label,
       category,
@@ -130,9 +131,8 @@ export class TransactionsResolver {
    * une Transaction. Le schéma généré contiendra :
    *   rechargeChildAccount(childId: ID!, amount: Float!): Transaction!
    *
-   * @UseGuards(GqlAuthGuard, RolesGuard) :
-   *   1. GqlAuthGuard vérifie le JWT.
-   *   2. RolesGuard vérifie que l'utilisateur a le rôle PARENT (@Roles(Role.PARENT)).
+   * @UseGuards(RolesGuard) : GqlAuthGuard est global (APP_GUARD), on n'a plus
+   * besoin de le lister. RolesGuard vérifie @Roles(Role.PARENT).
    *
    * @Roles(Role.PARENT) : seul un parent peut recharger un compte.
    *
@@ -148,7 +148,7 @@ export class TransactionsResolver {
    * n'est pas dans sa famille.
    */
   @Mutation(() => Transaction)
-  @UseGuards(GqlAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles(Role.PARENT)
   async rechargeChildAccount(
     @CurrentUser() user: JwtPayload,

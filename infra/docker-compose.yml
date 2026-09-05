@@ -3,7 +3,7 @@
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-familypay}
@@ -11,8 +11,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
+    # PG18+ stocke les données dans un sous-dossier version-spécifique sous
+    # /var/lib/postgresql (pas /var/lib/postgresql/data comme en PG16/17).
+    # Monter à la racine permet à pg_upgrade de fonctionner sans frontière de mount.
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-familypay}"]
       interval: 5s

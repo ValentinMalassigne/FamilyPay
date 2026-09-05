@@ -7,8 +7,8 @@ import { ApolloClient, HttpLink, InMemoryCache } from '@apollo/client';
 // En dev local : http://localhost:3000/graphql (voir .env.example).
 //
 // HttpLink : link de transport HTTP qui envoie les opérations GraphQL au backend
-// par POST. Depuis Apollo Client 3.14, le raccourci `uri` sur ApolloClient est
-// déprécié → on passe un HttpLink explicite.
+// par POST. Depuis Apollo Client 4, le raccourci `uri` sur ApolloClient est
+// supprimé → on passe un HttpLink explicite (déjà le cas depuis la v3.14).
 //
 // InMemoryCache : cache côté client normalisé des résultats GraphQL. Pour cette
 // init on garde la config par défaut ; on l'enrichira quand on aura des queries

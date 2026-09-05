@@ -42,6 +42,8 @@ Aucune vraie carte bancaire ni vrai paiement : toutes les transactions (dépense
 
 **Règle métier — blocage de carte** : le champ `blockedBy` détermine qui a la priorité. Si `blockedBy = PARENT`, seul un parent peut débloquer. Si `blockedBy = CHILD` (ou null), l'enfant peut lui-même bloquer/débloquer. Un parent peut toujours bloquer/débloquer quel que soit l'état actuel.
 
+**Règle métier — solde non négatif** : le solde d'un enfant ne peut **jamais** passer en négatif. On simule une carte bancaire pour ados, pas un découvert autorisé. Tout débit (EXPENSE, POT_WITHDRAWAL...) qui ferait passer `balance` sous 0 est rejeté côté backend (`BadRequestException`). Les crédits (RECHARGE, ALLOWANCE, MISSION_REWARD, QUIZ_REWARD, POT_CONTRIBUTION) sont toujours autorisés.
+
 ### Transaction
 - id, childId, amount (positif = crédit, négatif = débit), type (`RECHARGE` | `ALLOWANCE` | `EXPENSE` | `MISSION_REWARD` | `QUIZ_REWARD` | `POT_CONTRIBUTION` | `POT_WITHDRAWAL`), label, category (optionnel, ex. "Fast-food", "Loisirs"), createdAt, createdBy (`SYSTEM` | `CHILD` | `PARENT`)
 - `RECHARGE` : recharge manuelle ponctuelle par un parent (paiement CB simulé, pas de vrai encaissement)
@@ -130,11 +132,13 @@ type ChildAccount {
 
 type Transaction {
   id: ID!
+  childId: ID!
   amount: Float!
   type: TransactionType!
   label: String
   category: String
   createdAt: DateTime!
+  createdBy: CreatedBy!
 }
 
 type Pot {
