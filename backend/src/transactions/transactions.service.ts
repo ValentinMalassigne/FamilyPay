@@ -116,10 +116,17 @@ export class TransactionsService {
     // 5. Sauvegarder la transaction
     const savedTransaction = await this.transactionRepository.save(transaction);
 
-    // 6. Publier l'événement pour la subscription balanceUpdated
-    // L'événement est publié avec le childId comme clé pour filtrer les abonnements.
+    // 6. Publier les événements pour les subscriptions temps réel
+    // balanceUpdated : notifie les clients qui suivent le solde de l'enfant.
+    // transactionAdded : notifie les clients qui suivent les nouvelles
+    //   transactions de l'enfant (ex: historique temps réel sur le mobile).
+    // Les deux événements sont publiés avec le childId comme clé de topic
+    // pour le filtrage côté subscription.
     this.pubSub.publish(`BALANCE_UPDATED_${params.childId}`, {
       balanceUpdated: updatedAccount,
+    });
+    this.pubSub.publish(`TRANSACTION_ADDED_${params.childId}`, {
+      transactionAdded: savedTransaction,
     });
 
     // 7. Retourner la transaction

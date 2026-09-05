@@ -196,4 +196,32 @@ export class TransactionsResolver {
     // Quand un événement est publié sur ce topic, le client reçoit la donnée.
     return this.pubSub.asyncIterator(`BALANCE_UPDATED_${childId}`);
   }
+
+  /*
+   * Subscription transactionAdded : notifie en temps réel quand une nouvelle
+   * transaction est créée pour un enfant.
+   *
+   * Schéma §6 : transactionAdded(childId: ID!): Transaction!
+   *
+   * Fonctionnement des subscriptions GraphQL (voir balanceUpdated ci-dessus) :
+   *   1. Le client s'abonne via une requête subscription.
+   *   2. Le resolver retourne un AsyncIterator (via pubSub.asyncIterator).
+   *   3. Quand une transaction est créée (addTransaction dans le service),
+   *      pubSub.publish envoie l'événement TRANSACTION_ADDED_{childId}.
+   *   4. Le client reçoit la Transaction en temps réel via WebSocket.
+   *
+   * @Args('childId') childId : ID de l'enfant dont on suit les transactions.
+   *
+   * Filtre : le client ne reçoit que les transactions pour le childId spécifié.
+   * Utile pour rafraîchir l'historique de transactions sur le mobile sans polling.
+   */
+  @Subscription(() => Transaction, {
+    filter: (payload, variables) => {
+      // Filtrer pour ne notifier que les clients abonnés à ce childId spécifique.
+      return payload.transactionAdded.childId === variables.childId;
+    },
+  })
+  transactionAdded(@Args('childId') childId: string) {
+    return this.pubSub.asyncIterator(`TRANSACTION_ADDED_${childId}`);
+  }
 }
