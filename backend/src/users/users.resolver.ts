@@ -1,7 +1,8 @@
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { UseGuards } from '@nestjs/common';
+import { UseGuards, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { UsersService } from './users.service.js';
 import { User, Role } from './entities/user.entity.js';
+import { ChildAccount } from './entities/child-account.entity.js';
 import { RolesGuard } from '../common/roles.guard.js';
 import { Roles } from '../common/roles.decorator.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
@@ -42,6 +43,49 @@ export class UsersResolver {
       throw new Error('Utilisateur non trouvé');
     }
     return fullUser;
+  }
+
+  /*
+   * Query childAccount : retourne le compte d'un enfant (solde, blocage).
+   *
+   * Schéma §6 : childAccount(childId: ID!): ChildAccount!
+   *
+   * @UseGuards(RolesGuard) + @Roles(Role.PARENT) : seul un parent consulte
+   * le compte d'un enfant. GqlAuthGuard (global) vérifie le JWT au préalable.
+   *
+   * @Args('childId') childId : ID du User enfant (role=CHILD).
+   * @CurrentUser() user : payload JWT du parent.
+   *
+   * Règle métier : l'enfant doit faire partie de la même famille que le
+   * parent. On vérifie en chargeant le User enfant et en comparant familyId.
+   *
+   * @throws NotFoundException si l'enfant ou son ChildAccount n'existe pas.
+   * @throws ForbiddenException si l'enfant n'est pas dans la famille du parent.
+   */
+  @Query(() => ChildAccount)
+  @UseGuards(RolesGuard)
+  @Roles(Role.PARENT)
+  async childAccount(
+    @CurrentUser() user: JwtPayload,
+    @Args('childId') childId: string,
+  ): Promise<ChildAccount> {
+    // Vérifier que l'enfant existe et fait partie de la même famille.
+    const child = await this.usersService.findById(childId);
+    if (!child) {
+      throw new NotFoundException('Enfant non trouvé');
+    }
+    if (child.familyId !== user.familyId) {
+      throw new ForbiddenException(
+        "Vous n'avez pas accès au compte de cet enfant",
+      );
+    }
+
+    // Charger le ChildAccount lié à ce User enfant.
+    const account = await this.usersService.findChildAccountByUserId(childId);
+    if (!account) {
+      throw new NotFoundException('Compte enfant non trouvé');
+    }
+    return account;
   }
 
   /*

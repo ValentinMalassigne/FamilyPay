@@ -51,6 +51,17 @@ export class UsersService {
   }
 
   /*
+   * findChildAccountByUserId : recherche le ChildAccount d'un enfant par son
+   * userId (l'ID du User role=CHILD). Retourne null si non trouvé.
+   *
+   * Utilisé par la query childAccount(childId) : childId est l'ID du User enfant,
+   * et ChildAccount.userId pointe vers ce User (relation OneToOne).
+   */
+  async findChildAccountByUserId(userId: string): Promise<ChildAccount | null> {
+    return this.childAccountRepository.findOne({ where: { userId } });
+  }
+
+  /*
    * signup : crée la première Family + le premier User (role=PARENT).
    *
    * Flux (PROJECT_CONTEXT.md §4) : pas d'invitation par code. Le premier
