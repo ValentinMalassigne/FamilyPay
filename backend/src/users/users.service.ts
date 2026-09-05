@@ -1,10 +1,10 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User, Role } from './entities/user.entity.js';
 import { Family } from './entities/family.entity.js';
-import { ChildAccount } from './entities/child-account.entity.js';
+import { ChildAccount, BlockActor } from './entities/child-account.entity.js';
 
 /*
  * UsersService : service contenant la logique métier autour des utilisateurs.
@@ -218,6 +218,84 @@ export class UsersService {
       createdByUserId: params.creatorId,
     });
     return this.userRepository.save(user);
+  }
+
+  /*
+   * setCardBlocked : bloque ou débloque la carte d'un enfant.
+   *
+   * Règle métier — blocage de carte (PROJECT_CONTEXT.md §4) :
+   *  - blockedBy détermine la priorité.
+   *  - Si blockedBy = PARENT : seul un parent peut débloquer. L'enfant ne
+   *    peut rien faire (ni bloquer ni débloquer).
+   *  - Si blockedBy = CHILD ou null : l'enfant peut bloquer/débloquer lui-même.
+   *  - Un parent peut TOUJOURS bloquer/débloquer, quel que soit l'état actuel.
+   *
+   * Logique :
+   *  - Parent appelant :
+   *    - blocked=true  → blocked=true, blockedBy=PARENT.
+   *    - blocked=false → blocked=false, blockedBy=null.
+   *  - Enfant appelant (uniquement sur son propre compte) :
+   *    - Si blockedBy=PARENT → ForbiddenException (seul un parent peut débloquer).
+   *    - blocked=true  → blocked=true, blockedBy=CHILD.
+   *    - blocked=false → blocked=false, blockedBy=null.
+   *
+   * @throws NotFoundException si l'enfant ou son ChildAccount n'existe pas.
+   * @throws ForbiddenException si l'enfant n'est pas dans la famille du parent,
+   *         si l'enfant tente de modifier un compte qui n'est pas le sien,
+   *         ou si l'enfant tente de modifier une carte bloquée par un parent.
+   */
+  async setCardBlocked(params: {
+    childId: string;
+    blocked: boolean;
+    requesterId: string;
+    requesterRole: Role;
+    requesterFamilyId: string;
+  }): Promise<ChildAccount> {
+    const child = await this.findById(params.childId);
+    if (!child) {
+      throw new NotFoundException('Enfant non trouvé');
+    }
+
+    // Un parent peut agir sur les enfants de SA famille.
+    // Un enfant ne peut agir que sur son PROPRE compte.
+    if (params.requesterRole === Role.PARENT) {
+      if (child.familyId !== params.requesterFamilyId) {
+        throw new ForbiddenException(
+          "Vous n'avez pas accès au compte de cet enfant",
+        );
+      }
+    } else {
+      if (params.requesterId !== params.childId) {
+        throw new ForbiddenException(
+          'Un enfant ne peut bloquer que sa propre carte',
+        );
+      }
+    }
+
+    const account = await this.findChildAccountByUserId(params.childId);
+    if (!account) {
+      throw new NotFoundException('Compte enfant non trouvé');
+    }
+
+    // Si l'appelant est un enfant et que la carte est bloquée par un parent,
+    // il ne peut rien faire (ni bloquer ni débloquer).
+    if (
+      params.requesterRole === Role.CHILD &&
+      account.blockedBy === BlockActor.PARENT
+    ) {
+      throw new ForbiddenException(
+        'Cette carte a été bloquée par un parent — seul un parent peut la débloquer',
+      );
+    }
+
+    account.blocked = params.blocked;
+    account.blockedBy = params.blocked
+      ? params.requesterRole === Role.PARENT
+        ? BlockActor.PARENT
+        : BlockActor.CHILD
+      : null;
+
+    return this.childAccountRepository.save(account);
   }
 
   /*

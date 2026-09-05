@@ -175,4 +175,34 @@ export class UsersResolver {
       creatorFamilyId: creator.familyId,
     });
   }
+
+  /*
+   * Mutation setCardBlocked : bloque ou débloque la carte d'un enfant.
+   *
+   * Schéma §6 : setCardBlocked(childId: ID!, blocked: Boolean!): ChildAccount!
+   *
+   * GqlAuthGuard (global) vérifie le JWT. Pas de @Roles ici : un parent OU
+   * l'enfant lui-même peut bloquer/débloquer, mais la règle métier blockedBy
+   * est gérée dans le service :
+   *  - Parent → toujours autorisé (bloque avec blockedBy=PARENT, ou débloque).
+   *  - Enfant → bloqué si la carte est déjà bloquée par un parent (blockedBy=PARENT).
+   *
+   * @Args('childId') : ID de l'enfant dont on bloque/débloque la carte.
+   * @Args('blocked') : true = bloquer, false = débloquer.
+   * @CurrentUser() user : payload JWT (rôle PARENT ou CHILD).
+   */
+  @Mutation(() => ChildAccount)
+  async setCardBlocked(
+    @CurrentUser() user: JwtPayload,
+    @Args('childId') childId: string,
+    @Args('blocked') blocked: boolean,
+  ): Promise<ChildAccount> {
+    return this.usersService.setCardBlocked({
+      childId,
+      blocked,
+      requesterId: user.sub,
+      requesterRole: user.role,
+      requesterFamilyId: user.familyId,
+    });
+  }
 }
