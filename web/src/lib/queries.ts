@@ -262,6 +262,32 @@ export const VALIDATE_MISSION_MUTATION = /* GraphQL */ `
   }
 `;
 
+// Mutation createChildAccount : un parent crée le compte d'un enfant.
+// Le backend vérifie l'unicité de l'email (ConflictException si déjà utilisé),
+// hash le mot de passe et rattache l'enfant à la famille du parent créateur.
+// Retourne le User enfant créé (role=CHILD).
+export const CREATE_CHILD_ACCOUNT_MUTATION = /* GraphQL */ `
+  mutation CreateChildAccount(
+    $email: String!
+    $password: String!
+    $firstName: String!
+    $lastName: String!
+  ) {
+    createChildAccount(
+      email: $email
+      password: $password
+      firstName: $firstName
+      lastName: $lastName
+    ) {
+      id
+      email
+      role
+      firstName
+      lastName
+    }
+  }
+`;
+
 // Mutation setCardBlocked : bloque (blocked=true) ou débloque (blocked=false)
 // la carte d'un enfant. Un parent est toujours autorisé. Retourne le
 // ChildAccount mis à jour (blocked, blockedBy).

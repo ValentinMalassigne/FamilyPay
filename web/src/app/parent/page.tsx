@@ -7,6 +7,7 @@ import {
   type ChildAccountSummary,
 } from '@/lib/queries';
 import { LogoutButton } from './LogoutButton';
+import { AddChildForm } from './AddChildForm';
 
 // Espace parent (protégé par auth JWT parent).
 //
@@ -99,6 +100,9 @@ export default async function ParentPage() {
           ))}
         </ul>
       )}
+
+      <h2 style={{ marginTop: '2rem' }}>Ajouter un enfant</h2>
+      <AddChildForm />
     </main>
   );
 }
