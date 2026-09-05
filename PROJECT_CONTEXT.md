@@ -243,9 +243,9 @@ Contrainte importante : je suis débutant sur NestJS, GraphQL et PostgreSQL. Tou
 ## 11. Workflow Git
 
 **Branches**
-- `main` : toujours stable/démontrable, jamais de commit direct dessus
-- Une branche par fonctionnalité, préfixée par type : `feat/...`, `fix/...`, `chore/...`, `docs/...` (ex. `feat/backend-mission-flow`, `feat/mobile-biometric-unlock`)
-- Chaque branche est mergée dans `main` via une Pull Request (même en solo — ça garde un historique de revue propre et montre une pratique d'équipe en entretien), une fois la fonctionnalité fonctionnelle
+- `main` : branche de releases stables, jamais de commit direct dessus. Elle est mise à jour uniquement par PR depuis `development` au moment d'une démo ou d'une release.
+- `development` : branche d'intégration, cible de toutes les PR de feature.
+- Une branche par fonctionnalité, préfixée par type : `feat/...`, `fix/...`, `chore/...`, `docs/...` (ex. `feat/backend-mission-flow`, `feat/mobile-biometric-unlock`). Les branches de feature partent de `development` et y sont mergées via une Pull Request (même en solo — ça garde un historique de revue propre et montre une pratique d'équipe en entretien), une fois la fonctionnalité fonctionnelle. Pour en créer une : `git checkout development && git pull && git checkout -b feat/...`
 
 **Commits — Conventional Commits, atomiques**
 - Format : `type(scope): description au présent, en minuscule, sans point final`
