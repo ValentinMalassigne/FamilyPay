@@ -7,7 +7,7 @@ import {
   type AllowanceRule,
   type ChildAccountSummary,
 } from '@/lib/queries';
-import { CreateAllowanceForm } from './AllowanceActions';
+import { CreateAllowanceForm, EditAllowanceForm, DeleteAllowanceButton } from './AllowanceActions';
 
 // Liste des virements automatiques d'un enfant (Server Component, auth parent).
 //
@@ -89,6 +89,8 @@ export default async function AllowancesPage({
                   <span style={{ color: '#888' }}>Suspendu</span>
                 )}
               </div>
+              <EditAllowanceForm rule={rule} />
+              <DeleteAllowanceButton ruleId={rule.id} />
             </li>
           ))}
         </ul>

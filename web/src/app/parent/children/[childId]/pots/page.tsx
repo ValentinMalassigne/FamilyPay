@@ -7,7 +7,7 @@ import {
   type Pot,
   type ChildAccountSummary,
 } from '@/lib/queries';
-import { CreatePotForm, WithdrawPotButton } from './PotActions';
+import { CreatePotForm, WithdrawPotButton, EditPotForm, DeletePotButton } from './PotActions';
 
 // Liste des cagnottes d'un enfant (Server Component, auth JWT parent).
 //
@@ -117,8 +117,13 @@ export default async function PotsPage({
                         currentAmount={pot.currentAmount}
                       />
                     </div>
+                    <EditPotForm pot={pot} />
                   </>
                 )}
+                <DeletePotButton
+                  potId={pot.id}
+                  currentAmount={pot.currentAmount}
+                />
               </li>
             );
           })}

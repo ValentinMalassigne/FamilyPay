@@ -198,6 +198,39 @@ export const WITHDRAW_FROM_POT_MUTATION = /* GraphQL */ `
   }
 `;
 
+// Mutation updatePot : un parent modifie une cagnotte OPEN (édition partielle).
+// Les champs title, targetAmount, withdrawalPolicy sont optionnels.
+export const UPDATE_POT_MUTATION = /* GraphQL */ `
+  mutation UpdatePot(
+    $potId: ID!
+    $title: String
+    $targetAmount: Float
+    $withdrawalPolicy: WithdrawalPolicy
+  ) {
+    updatePot(
+      potId: $potId
+      title: $title
+      targetAmount: $targetAmount
+      withdrawalPolicy: $withdrawalPolicy
+    ) {
+      id
+      title
+      targetAmount
+      currentAmount
+      publicToken
+      withdrawalPolicy
+      status
+    }
+  }
+`;
+
+// Mutation deletePot : un parent supprime une cagnotte vide (currentAmount === 0).
+export const DELETE_POT_MUTATION = /* GraphQL */ `
+  mutation DeletePot($potId: ID!) {
+    deletePot(potId: $potId)
+  }
+`;
+
 // Mutation contributeToPotPublic : don public SANS auth (@Public côté backend).
 // Appelée depuis la page /donate/[token] via le proxy /api/graphql sans JWT.
 export const CONTRIBUTE_TO_POT_PUBLIC_MUTATION = /* GraphQL */ `
@@ -266,6 +299,37 @@ export const VALIDATE_MISSION_MUTATION = /* GraphQL */ `
       reward
       status
     }
+  }
+`;
+
+// Mutation updateMission : un parent modifie une mission (édition partielle).
+// Les champs title, reward, status sont optionnels. Le passage à VALIDATED
+// crée la Transaction MISSION_REWARD côté backend.
+export const UPDATE_MISSION_MUTATION = /* GraphQL */ `
+  mutation UpdateMission(
+    $missionId: ID!
+    $title: String
+    $reward: Float
+    $status: MissionStatus
+  ) {
+    updateMission(
+      missionId: $missionId
+      title: $title
+      reward: $reward
+      status: $status
+    ) {
+      id
+      title
+      reward
+      status
+    }
+  }
+`;
+
+// Mutation deleteMission : un parent supprime une mission (tous statuts).
+export const DELETE_MISSION_MUTATION = /* GraphQL */ `
+  mutation DeleteMission($missionId: ID!) {
+    deleteMission(missionId: $missionId)
   }
 `;
 
@@ -357,5 +421,37 @@ export const CREATE_ALLOWANCE_RULE_MUTATION = /* GraphQL */ `
       frequency
       active
     }
+  }
+`;
+
+// Mutation updateAllowanceRule : un parent modifie un virement (édition
+// partielle). Les champs amount, frequency, active sont optionnels. Un
+// changement de frequency recalcule nextRunAt côté backend.
+export const UPDATE_ALLOWANCE_RULE_MUTATION = /* GraphQL */ `
+  mutation UpdateAllowanceRule(
+    $ruleId: ID!
+    $amount: Float
+    $frequency: AllowanceFrequency
+    $active: Boolean
+  ) {
+    updateAllowanceRule(
+      ruleId: $ruleId
+      amount: $amount
+      frequency: $frequency
+      active: $active
+    ) {
+      id
+      childId
+      amount
+      frequency
+      active
+    }
+  }
+`;
+
+// Mutation deleteAllowanceRule : un parent supprime un virement.
+export const DELETE_ALLOWANCE_RULE_MUTATION = /* GraphQL */ `
+  mutation DeleteAllowanceRule($ruleId: ID!) {
+    deleteAllowanceRule(ruleId: $ruleId)
   }
 `;
