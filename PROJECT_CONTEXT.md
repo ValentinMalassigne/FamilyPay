@@ -42,7 +42,7 @@ Aucune vraie carte bancaire ni vrai paiement : toutes les transactions (dépense
 
 **Règle métier — blocage de carte** : le champ `blockedBy` détermine qui a la priorité. Si `blockedBy = PARENT`, seul un parent peut débloquer. Si `blockedBy = CHILD` (ou null), l'enfant peut lui-même bloquer/débloquer. Un parent peut toujours bloquer/débloquer quel que soit l'état actuel.
 
-**Règle métier — solde non négatif** : le solde d'un enfant ne peut **jamais** passer en négatif. On simule une carte bancaire pour ados, pas un découvert autorisé. Tout débit (EXPENSE, POT_WITHDRAWAL...) qui ferait passer `balance` sous 0 est rejeté côté backend (`BadRequestException`). Les crédits (RECHARGE, ALLOWANCE, MISSION_REWARD, QUIZ_REWARD, POT_CONTRIBUTION) sont toujours autorisés.
+**Règle métier — solde non négatif** : le solde d'un enfant ne peut **jamais** passer en négatif. On simule une carte bancaire pour ados, pas un découvert autorisé. Tout débit (EXPENSE...) qui ferait passer `balance` sous 0 est rejeté côté backend (`BadRequestException`). Les crédits (RECHARGE, ALLOWANCE, MISSION_REWARD, QUIZ_REWARD, POT_WITHDRAWAL) sont toujours autorisés. `POT_CONTRIBUTION` n'affecte plus le solde principal (la cagnotte est un solde séparé).
 
 ### Transaction
 - id, childId, amount (positif = crédit, négatif = débit), type (`RECHARGE` | `ALLOWANCE` | `EXPENSE` | `MISSION_REWARD` | `QUIZ_REWARD` | `POT_CONTRIBUTION` | `POT_WITHDRAWAL`), label, category (optionnel, ex. "Fast-food", "Loisirs"), createdAt, createdBy (`SYSTEM` | `CHILD` | `PARENT`)
@@ -55,14 +55,14 @@ Aucune vraie carte bancaire ni vrai paiement : toutes les transactions (dépense
 - Défini par un parent. Exécuté par un cron NestJS (`@nestjs/schedule`) qui crée une `Transaction` de type `ALLOWANCE` et met à jour le solde. Indépendant des recharges manuelles ponctuelles (`RECHARGE`).
 
 ### Pot (cagnotte)
-- id, childId, title, targetAmount, currentAmount, publicToken (UUID, pour le lien de don public), hiddenFrom (liste d'userId de parents à qui la cagnotte est masquée — vide par défaut = visible par toute la famille), withdrawalPolicy (`ANYTIME` | `WHEN_FULL` | `PARENT_ONLY`, défini par le parent à la création de la cagnotte)
+- id, childId, title, targetAmount, currentAmount, publicToken (UUID, pour le lien de don public), hiddenFrom (liste d'userId de parents à qui la cagnotte est masquée — vide par défaut = visible par toute la famille), withdrawalPolicy (`ANYTIME` | `WHEN_FULL` | `PARENT_ONLY`, défini par le parent à la création de la cagnotte), status (`OPEN` | `CLOSED`, défaut `OPEN`)
 - Une cagnotte est toujours visible par l'enfant propriétaire. `hiddenFrom` permet de masquer une cagnotte à un parent spécifique (ex. cagnotte "cadeau papa" avec `hiddenFrom = [id du père]`).
 
-**Règle métier — retrait de cagnotte** : `withdrawalPolicy` détermine si l'enfant peut retirer librement (`ANYTIME`), uniquement une fois l'objectif atteint (`WHEN_FULL`), ou jamais lui-même (`PARENT_ONLY`, seul un parent peut transférer l'argent vers le solde principal). **Dans tous les cas, un parent peut effectuer le retrait lui-même**, quelle que soit la policy — le guard sur la mutation de retrait doit distinguer l'appelant (enfant → vérifier la policy ; parent → toujours autorisé).
+**Règle métier — retrait de cagnotte** : `withdrawalPolicy` détermine si l'enfant peut retirer librement (`ANYTIME`), uniquement une fois l'objectif atteint (`WHEN_FULL`), ou jamais lui-même (`PARENT_ONLY`, seul un parent peut transférer l'argent vers le solde principal). **Dans tous les cas, un parent peut effectuer le retrait lui-même**, quelle que soit la policy — le guard sur la mutation de retrait doit distinguer l'appelant (enfant → vérifier la policy ; parent → toujours autorisé). **Tout retrait clôture la cagnotte (status → CLOSED), plus aucune contribution n'est acceptée (enfant, parent, ou don public). Le retrait transfère l'intégralité du `currentAmount` vers le solde principal de l'enfant** — une cagnotte se vide en une fois, puis se clôture.
 
 ### PotContribution
 - id, potId, amount, contributorName (texte libre, optionnel — pour les dons publics anonymes ou signés), createdAt, isPublicDonation (bool)
-- Une contribution publique (via le lien, sans auth) crée une `PotContribution` + une `Transaction` de type `POT_CONTRIBUTION` sur le compte de l'enfant.
+- Une contribution publique (via le lien, sans auth) crée une `PotContribution` et met à jour `pot.currentAmount`. Aucune transaction sur le solde principal — la cagnotte est un solde séparé. L'argent n'est transféré vers le solde principal qu'au moment du retrait (voir `Pot` ci-dessus).
 - **Montant plafonné** : le montant d'une contribution (publique ou non) ne peut pas dépasser la place restante dans la cagnotte (`targetAmount - currentAmount`), pour éviter tout dépassement de l'objectif. À valider côté resolver avant insertion.
 
 ### Mission
@@ -149,6 +149,7 @@ type Pot {
   publicToken: String!
   hiddenFrom: [ID!]!
   withdrawalPolicy: WithdrawalPolicy!
+  status: PotStatus!
 }
 
 type Mission {
