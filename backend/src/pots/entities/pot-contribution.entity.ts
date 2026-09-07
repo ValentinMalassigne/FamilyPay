@@ -57,8 +57,11 @@ export class PotContribution {
    * (null) ou signés (ex: "Tante Sophie"). Permet d'afficher le nom du
    * donateur sans créer de compte utilisateur.
    */
+  // TypeORM 1.x n'infère pas le type SQL depuis `string | null` (il tombe sur
+  // `Object`, non supporté par PostgreSQL). On déclare donc `type: 'varchar'`
+  // explicitement, comme pour les autres colonnes text de l'entité.
   @Field({ nullable: true })
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   contributorName: string | null;
 
   /*

@@ -88,7 +88,9 @@ export class Mission {
    * non exposée en GraphQL car absente du type Mission du §6). Nullable car
    * la mutation createMission du §6 ne prend pas de description.
    */
-  @Column({ nullable: true })
+  // TypeORM 1.x n'infère pas le type SQL depuis `string | null` (il tombe sur
+  // `Object`, non supporté par PostgreSQL). On déclare `type: 'varchar'`.
+  @Column({ type: 'varchar', nullable: true })
   description: string | null;
 
   @Field()
