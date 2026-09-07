@@ -56,9 +56,21 @@ export class UsersService {
    *
    * Utilisé par la query childAccount(childId) : childId est l'ID du User enfant,
    * et ChildAccount.userId pointe vers ce User (relation OneToOne).
+   *
+   * relations: { user: true } : on charge EAGER la relation user ici (au lieu de
+   * s'appuyer sur le lazy loading TypeORM). Le champ GraphQL `user` est déclaré
+   * non-nullable (@Field(() => User) sur l'entité) et consommé par le web
+   * (childAccount { user { id firstName lastName email } }). Sans ce eager,
+   * NestJS doit résoudre la Promise lazy à la volée, ce qui est fragile et
+   * asymétrique avec findChildrenByFamilyId (qui charge déjà user en eager).
+   * On aligne les deux méthodes pour éviter qu'un enfant apparaisse dans
+   * myChildren mais refuse de se charger via childAccount.
    */
   async findChildAccountByUserId(userId: string): Promise<ChildAccount | null> {
-    return this.childAccountRepository.findOne({ where: { userId } });
+    return this.childAccountRepository.findOne({
+      where: { userId },
+      relations: { user: true },
+    });
   }
 
   /*
