@@ -74,7 +74,10 @@ export class PotsResolver {
     @Args('childId', { type: () => ID }) childId: string,
     @Args('title') title: string,
     @Args('targetAmount') targetAmount: number,
-    @Args('withdrawalPolicy') withdrawalPolicy: WithdrawalPolicy,
+    // type: () => WithdrawalPolicy : typage explicite requis car reflect-metadata
+    // infère String pour les args enum, ce qui génère `String!` au lieu de
+    // `WithdrawalPolicy!` dans le schéma GraphQL (même classe de bug que les ID).
+    @Args('withdrawalPolicy', { type: () => WithdrawalPolicy }) withdrawalPolicy: WithdrawalPolicy,
   ): Promise<Pot> {
     return this.potsService.createPot({
       childId,

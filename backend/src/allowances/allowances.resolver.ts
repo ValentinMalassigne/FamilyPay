@@ -65,7 +65,10 @@ export class AllowancesResolver {
     @CurrentUser() creator: JwtPayload,
     @Args('childId', { type: () => ID }) childId: string,
     @Args('amount') amount: number,
-    @Args('frequency') frequency: AllowanceFrequency,
+    // type: () => AllowanceFrequency : typage explicite requis car reflect-metadata
+    // infère String pour les args enum, ce qui génère `String!` au lieu de
+    // `AllowanceFrequency!` dans le schéma GraphQL (même classe de bug que les ID).
+    @Args('frequency', { type: () => AllowanceFrequency }) frequency: AllowanceFrequency,
   ): Promise<AllowanceRule> {
     return this.allowancesService.createAllowanceRule({
       childId,
