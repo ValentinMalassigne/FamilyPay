@@ -340,4 +340,130 @@ export class PotsService {
 
     return transaction;
   }
+
+  /*
+   * updatePot : un parent modifie une cagnotte existante.
+   *
+   * Règles métier (décisions de design) :
+   *  - Seule une cagnotte OPEN est éditable. Une cagnotte CLOSED (après retrait)
+   *    n'est plus modifiable — on ne peut que la supprimer si elle est vide.
+   *  - title, si fourni, doit être non vide.
+   *  - targetAmount, si fourni, doit être > 0 et >= currentAmount (on ne peut
+   *    pas baisser l'objectif sous le montant déjà accumulé).
+   *  - withdrawalPolicy, si fourni, est déjà validé par l'enum GraphQL.
+   *  - Les champs non fournis (undefined) ne sont pas modifiés (édition
+   *    partielle).
+   *
+   * @throws NotFoundException si la cagnotte n'existe pas.
+   * @throws ForbiddenException si la cagnotte n'appartient pas à la famille
+   *         du parent.
+   * @throws BadRequestException si la cagnotte est CLOSED, si title est vide,
+   *         ou si targetAmount est invalide.
+   */
+  async updatePot(params: {
+    potId: string;
+    title?: string;
+    targetAmount?: number;
+    withdrawalPolicy?: WithdrawalPolicy;
+    requester: JwtPayload;
+  }): Promise<Pot> {
+    const pot = await this.potRepository.findOne({
+      where: { id: params.potId },
+    });
+    if (!pot) {
+      throw new NotFoundException('Cagnotte non trouvée');
+    }
+
+    // Vérifier l'appartenance famille : on charge l'enfant propriétaire et on
+    // compare son familyId à celui du parent appelant (même pattern que
+    // createPot / withdrawFromPot).
+    const child = await this.usersService.findById(pot.childId);
+    if (!child || child.familyId !== params.requester.familyId) {
+      throw new ForbiddenException(
+        "Vous n'avez pas le droit de modifier cette cagnotte",
+      );
+    }
+
+    // Une cagnotte clôturée n'est plus éditable.
+    if (pot.status === PotStatus.CLOSED) {
+      throw new BadRequestException(
+        'Une cagnotte clôturée ne peut plus être modifiée',
+      );
+    }
+
+    if (params.title !== undefined && params.title.trim() === '') {
+      throw new BadRequestException('Le titre ne peut pas être vide');
+    }
+
+    if (params.targetAmount !== undefined) {
+      if (params.targetAmount <= 0) {
+        throw new BadRequestException('Le montant objectif doit être positif');
+      }
+      // On ne peut pas baisser l'objectif sous le montant déjà accumulé.
+      if (params.targetAmount < pot.currentAmount) {
+        throw new BadRequestException(
+          `L'objectif ne peut pas être inférieur au montant déjà accumulé (${pot.currentAmount}€)`,
+        );
+      }
+    }
+
+    // Appliquer uniquement les champs fournis (édition partielle).
+    if (params.title !== undefined) pot.title = params.title.trim();
+    if (params.targetAmount !== undefined) pot.targetAmount = params.targetAmount;
+    if (params.withdrawalPolicy !== undefined) {
+      pot.withdrawalPolicy = params.withdrawalPolicy;
+    }
+
+    return this.potRepository.save(pot);
+  }
+
+  /*
+   * deletePot : un parent supprime une cagnotte.
+   *
+   * Règles métier (décisions de design) :
+   *  - On ne peut pas supprimer une cagnotte qui contient de l'argent
+   *    (currentAmount > 0 → BadRequestException). Le parent doit d'abord
+   *    retirer l'argent (withdrawFromPot), ce qui vide la cagnotte et la
+   *    clôture.
+   *  - Une cagnotte vide (OPEN ou CLOSED) peut être supprimée.
+   *  - Les PotContribution associées sont supprimées en cascade manuelle avant
+   *    le pot (pas de cascade DB automatique sur la relation).
+   *
+   * @throws NotFoundException si la cagnotte n'existe pas.
+   * @throws ForbiddenException si la cagnotte n'appartient pas à la famille.
+   * @throws BadRequestException si currentAmount > 0.
+   */
+  async deletePot(params: {
+    potId: string;
+    requester: JwtPayload;
+  }): Promise<boolean> {
+    const pot = await this.potRepository.findOne({
+      where: { id: params.potId },
+    });
+    if (!pot) {
+      throw new NotFoundException('Cagnotte non trouvée');
+    }
+
+    const child = await this.usersService.findById(pot.childId);
+    if (!child || child.familyId !== params.requester.familyId) {
+      throw new ForbiddenException(
+        "Vous n'avez pas le droit de supprimer cette cagnotte",
+      );
+    }
+
+    // On ne peut pas supprimer une cagnotte qui contient encore de l'argent.
+    if (pot.currentAmount > 0) {
+      throw new BadRequestException(
+        'Impossible de supprimer une cagnotte qui contient de l\'argent — retirez l\'argent d\'abord',
+      );
+    }
+
+    // Cascade manuelle : supprimer d'abord les contributions associées, puis
+    // le pot lui-même. On utilise delete() (par critère) plutôt que remove()
+    // (par entité) pour éviter de charger chaque contribution.
+    await this.potContributionRepository.delete({ potId: pot.id });
+    await this.potRepository.delete({ id: pot.id });
+
+    return true;
+  }
 }
