@@ -21,7 +21,13 @@ const GRAPHQL_URL =
 
 export const AUTH_COOKIE = 'fp_token';
 
-export type GraphQLResult<T> = { data?: T; errors?: Array<{ message: string }> };
+export type GraphQLResult<T> = {
+  data?: T;
+  errors?: Array<{
+    message: string;
+    extensions?: { code?: string };
+  }>;
+};
 
 /*
  * serverGraphQL : exécute une opération GraphQL (query ou mutation) côté serveur.
