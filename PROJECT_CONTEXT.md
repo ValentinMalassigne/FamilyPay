@@ -193,6 +193,12 @@ type Mutation {
   answerQuiz(quizId: ID!, answerIndex: Int!): QuizAttempt!
   setRecommendation(childId: ID!, domain: Domain!, description: String!): Recommendation!
   generateAICoachInsight(childId: ID!): AIInsight!
+  updatePot(potId: ID!, title: String, targetAmount: Float, withdrawalPolicy: WithdrawalPolicy): Pot!
+  deletePot(potId: ID!): Boolean!
+  updateMission(missionId: ID!, title: String, reward: Float, status: MissionStatus): Mission!
+  deleteMission(missionId: ID!): Boolean!
+  updateAllowanceRule(ruleId: ID!, amount: Float, frequency: AllowanceFrequency, active: Boolean): AllowanceRule!
+  deleteAllowanceRule(ruleId: ID!): Boolean!
 }
 
 # Subscriptions
