@@ -20,6 +20,8 @@ import type { JwtPayload } from '../common/types.js';
  * Resolvers définis :
  * - Query allowanceRules : liste les règles de virement d'un enfant.
  * - Mutation createAllowanceRule : un parent crée un virement récurrent.
+ * - Mutation updateAllowanceRule : un parent modifie un virement (PARENT only).
+ * - Mutation deleteAllowanceRule : un parent supprime un virement (PARENT only).
  *
  * Le cron @Cron (processDueAllowances) n'est PAS un resolver — il tourne en
  * arrière-plan dans AllowancesService et n'est pas exposé via GraphQL.
@@ -75,6 +77,70 @@ export class AllowancesResolver {
       amount,
       frequency,
       creator,
+    });
+  }
+
+  /*
+   * Mutation updateAllowanceRule : un parent modifie un virement (édition
+   * partielle).
+   *
+   * Schéma §6 : updateAllowanceRule(ruleId: ID!, amount: Float,
+   *   frequency: AllowanceFrequency, active: Boolean): AllowanceRule!
+   *
+   * @UseGuards(RolesGuard) + @Roles(Role.PARENT) : seul un PARENT peut modifier
+   * un virement. L'appartenance à la même famille est vérifiée dans le service.
+   *
+   * Les champs amount, frequency et active sont tous optionnels. Un changement
+   * de frequency recalcule nextRunAt ; un changement de amount/active garde le
+   * nextRunAt actuel (voir le service pour les détails).
+   *
+   * @Args('ruleId') ruleId : ID de la règle à modifier.
+   * @Args('amount', { nullable: true }) : nouveau montant (optionnel).
+   * @Args('frequency', { nullable: true }) : nouvelle fréquence (optionnel).
+   * @Args('active', { nullable: true }) : activer/suspendre (optionnel).
+   * @CurrentUser() user : payload JWT du parent.
+   */
+  @Mutation(() => AllowanceRule)
+  @UseGuards(RolesGuard)
+  @Roles(Role.PARENT)
+  async updateAllowanceRule(
+    @CurrentUser() user: JwtPayload,
+    @Args('ruleId', { type: () => ID }) ruleId: string,
+    @Args('amount', { nullable: true }) amount?: number,
+    @Args('frequency', { type: () => AllowanceFrequency, nullable: true })
+    frequency?: AllowanceFrequency,
+    @Args('active', { nullable: true }) active?: boolean,
+  ): Promise<AllowanceRule> {
+    return this.allowancesService.updateAllowanceRule({
+      ruleId,
+      amount,
+      frequency,
+      active,
+      requester: user,
+    });
+  }
+
+  /*
+   * Mutation deleteAllowanceRule : un parent supprime un virement.
+   *
+   * Schéma §6 : deleteAllowanceRule(ruleId: ID!): Boolean!
+   *
+   * @UseGuards(RolesGuard) + @Roles(Role.PARENT) : seul un PARENT peut supprimer
+   * un virement. L'appartenance à la même famille est vérifiée dans le service.
+   *
+   * @Args('ruleId') ruleId : ID de la règle à supprimer.
+   * @CurrentUser() user : payload JWT du parent.
+   */
+  @Mutation(() => Boolean)
+  @UseGuards(RolesGuard)
+  @Roles(Role.PARENT)
+  async deleteAllowanceRule(
+    @CurrentUser() user: JwtPayload,
+    @Args('ruleId', { type: () => ID }) ruleId: string,
+  ): Promise<boolean> {
+    return this.allowancesService.deleteAllowanceRule({
+      ruleId,
+      requester: user,
     });
   }
 }
