@@ -3,7 +3,7 @@ import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
 // (childId, missionId ici) afin de générer `ID!` et non `String!` dans le schéma GraphQL.
 import { UseGuards } from '@nestjs/common';
 import { MissionsService } from './missions.service.js';
-import { Mission } from './entities/mission.entity.js';
+import { Mission, MissionStatus } from './entities/mission.entity.js';
 import { RolesGuard } from '../common/roles.guard.js';
 import { Roles } from '../common/roles.decorator.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
@@ -25,6 +25,8 @@ import type { JwtPayload } from '../common/types.js';
  * - Mutation markMissionDone : l'enfant marque sa mission comme faite.
  * - Mutation validateMission : un parent valide (approve=true) ou refuse
  *   (approve=false) une mission marquée faite.
+ * - Mutation updateMission : un parent modifie une mission (PARENT only).
+ * - Mutation deleteMission : un parent supprime une mission (PARENT only).
  */
 @Resolver(() => Mission)
 export class MissionsResolver {
@@ -118,5 +120,68 @@ export class MissionsResolver {
     @Args('approve') approve: boolean,
   ): Promise<Mission> {
     return this.missionsService.validateMission(missionId, approve, user);
+  }
+
+  /*
+   * Mutation updateMission : un parent modifie une mission (édition partielle).
+   *
+   * Schéma §6 : updateMission(missionId: ID!, title: String, reward: Float,
+   *   status: MissionStatus): Mission!
+   *
+   * @UseGuards(RolesGuard) + @Roles(Role.PARENT) : seul un PARENT peut modifier
+   * une mission. L'appartenance à la même famille est vérifiée dans le service.
+   *
+   * Les champs title, reward et status sont tous optionnels : seuls les champs
+   * fournis sont mis à jour. Le passage à VALIDATED crée la Transaction
+   * MISSION_REWARD (voir le service pour les détails).
+   *
+   * @Args('missionId') missionId : ID de la mission à modifier.
+   * @Args('title', { nullable: true }) : nouveau titre (optionnel).
+   * @Args('reward', { nullable: true }) : nouvelle récompense (optionnel).
+   * @Args('status', { nullable: true }) : nouveau statut (optionnel).
+   * @CurrentUser() user : payload JWT du parent.
+   */
+  @Mutation(() => Mission)
+  @UseGuards(RolesGuard)
+  @Roles(Role.PARENT)
+  async updateMission(
+    @CurrentUser() user: JwtPayload,
+    @Args('missionId', { type: () => ID }) missionId: string,
+    @Args('title', { nullable: true }) title?: string,
+    @Args('reward', { nullable: true }) reward?: number,
+    @Args('status', { type: () => MissionStatus, nullable: true })
+    status?: MissionStatus,
+  ): Promise<Mission> {
+    return this.missionsService.updateMission({
+      missionId,
+      title,
+      reward,
+      status,
+      requester: user,
+    });
+  }
+
+  /*
+   * Mutation deleteMission : un parent supprime une mission.
+   *
+   * Schéma §6 : deleteMission(missionId: ID!): Boolean!
+   *
+   * @UseGuards(RolesGuard) + @Roles(Role.PARENT) : seul un PARENT peut supprimer
+   * une mission. L'appartenance à la même famille est vérifiée dans le service.
+   *
+   * Aucune restriction de statut : la mission est supprimée quel que soit son
+   * état. La Transaction MISSION_REWARD éventuelle reste (non reversible).
+   *
+   * @Args('missionId') missionId : ID de la mission à supprimer.
+   * @CurrentUser() user : payload JWT du parent.
+   */
+  @Mutation(() => Boolean)
+  @UseGuards(RolesGuard)
+  @Roles(Role.PARENT)
+  async deleteMission(
+    @CurrentUser() user: JwtPayload,
+    @Args('missionId', { type: () => ID }) missionId: string,
+  ): Promise<boolean> {
+    return this.missionsService.deleteMission({ missionId, requester: user });
   }
 }
