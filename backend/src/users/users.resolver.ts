@@ -1,4 +1,10 @@
-import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
+// ID est importé pour typer explicitement les @Args d'identifiant en GraphQL.
+// reflect-metadata infère `String` pour un paramètre `string`, ce qui génère un
+// arg `String!` dans le schéma. Or PROJECT_CONTEXT.md §6 exige `ID!` pour les
+// identifiants (childId, missionId, potId...). Sans ce typage explicit, une
+// variable `$childId: ID!` côté client est rejetée par validation GraphQL
+// ("Variable of type ID! used in position expecting type String!").
 import { UseGuards, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { UsersService } from './users.service.js';
 import { User, Role } from './entities/user.entity.js';
@@ -67,7 +73,7 @@ export class UsersResolver {
   @Roles(Role.PARENT)
   async childAccount(
     @CurrentUser() user: JwtPayload,
-    @Args('childId') childId: string,
+    @Args('childId', { type: () => ID }) childId: string,
   ): Promise<ChildAccount> {
     // Vérifier que l'enfant existe et fait partie de la même famille.
     const child = await this.usersService.findById(childId);
@@ -194,7 +200,7 @@ export class UsersResolver {
   @Mutation(() => ChildAccount)
   async setCardBlocked(
     @CurrentUser() user: JwtPayload,
-    @Args('childId') childId: string,
+    @Args('childId', { type: () => ID }) childId: string,
     @Args('blocked') blocked: boolean,
   ): Promise<ChildAccount> {
     return this.usersService.setCardBlocked({

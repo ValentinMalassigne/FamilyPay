@@ -1,4 +1,6 @@
-import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
+// ID : voir users.resolver.ts — typage explicite requis pour les args d'identifiant
+// (childId ici) afin de générer `ID!` et non `String!` dans le schéma GraphQL.
 import { UseGuards } from '@nestjs/common';
 import { AllowancesService } from './allowances.service.js';
 import { AllowanceRule, AllowanceFrequency } from './entities/allowance-rule.entity.js';
@@ -38,7 +40,7 @@ export class AllowancesResolver {
   @Query(() => [AllowanceRule])
   async allowanceRules(
     @CurrentUser() user: JwtPayload,
-    @Args('childId') childId: string,
+    @Args('childId', { type: () => ID }) childId: string,
   ): Promise<AllowanceRule[]> {
     return this.allowancesService.getAllowanceRulesForChild(childId, user);
   }
@@ -61,9 +63,12 @@ export class AllowancesResolver {
   @Roles(Role.PARENT)
   async createAllowanceRule(
     @CurrentUser() creator: JwtPayload,
-    @Args('childId') childId: string,
+    @Args('childId', { type: () => ID }) childId: string,
     @Args('amount') amount: number,
-    @Args('frequency') frequency: AllowanceFrequency,
+    // type: () => AllowanceFrequency : typage explicite requis car reflect-metadata
+    // infère String pour les args enum, ce qui génère `String!` au lieu de
+    // `AllowanceFrequency!` dans le schéma GraphQL (même classe de bug que les ID).
+    @Args('frequency', { type: () => AllowanceFrequency }) frequency: AllowanceFrequency,
   ): Promise<AllowanceRule> {
     return this.allowancesService.createAllowanceRule({
       childId,

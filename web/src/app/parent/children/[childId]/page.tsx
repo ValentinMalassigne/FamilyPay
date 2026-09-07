@@ -35,14 +35,32 @@ export default async function ChildDetailPage({
     token,
   );
 
-  // Forbidden = enfant hors famille → retour au dashboard parent.
-  // Token invalide → /login.
+  // Gestion des erreurs GraphQL : on distingue auth vs autres.
+  //
+  // - Erreur d'auth (token manquant/invalide/expiré, UNAUTHENTICATED) → /login.
+  //   L'utilisateur doit se reconnecter. Le GqlAuthGuard backend lève
+  //   UnauthorizedException ("Token JWT manquant", "Token JWT invalide ou
+  //   expiré") → code GraphQL UNAUTHENTICATED.
+  // - Toute autre erreur (ForbiddenException, NotFoundException, erreur
+  //   interne, relation non chargeable) → /parent. L'utilisateur est encore
+  //   authentifié : on le renvoie au dashboard au lieu de le déconnecter
+  //   faussement. C'est le fix clé : avant, seule "pas accès"/"forbidden"
+  //   allait vers /parent, tout le reste (y compris NotFound) partait vers
+  //   /login.
   if (result.errors) {
-    const forbidden = result.errors.some((e) =>
-      e.message.toLowerCase().includes('pas accès') ||
-      e.message.toLowerCase().includes('forbidden'),
-    );
-    redirect(forbidden ? '/parent' : '/login');
+    const authError = result.errors.some((e) => {
+      const msg = e.message.toLowerCase();
+      return (
+        e.extensions?.code === 'UNAUTHENTICATED' ||
+        msg.includes('token') ||
+        msg.includes('jwt') ||
+        msg.includes('expiré') ||
+        msg.includes('unauthenticated') ||
+        msg.includes('non authentifié') ||
+        msg.includes('manquant')
+      );
+    });
+    redirect(authError ? '/login' : '/parent');
   }
 
   const account = result.data?.childAccount;

@@ -1,4 +1,6 @@
-import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
+// ID : voir users.resolver.ts — typage explicite requis pour les args d'identifiant
+// (childId, potId ici) afin de générer `ID!` et non `String!` dans le schéma GraphQL.
 import { UseGuards } from '@nestjs/common';
 import { PotsService } from './pots.service.js';
 import { Pot, WithdrawalPolicy } from './entities/pot.entity.js';
@@ -44,7 +46,7 @@ export class PotsResolver {
   @Query(() => [Pot])
   async pots(
     @CurrentUser() user: JwtPayload,
-    @Args('childId') childId: string,
+    @Args('childId', { type: () => ID }) childId: string,
   ): Promise<Pot[]> {
     return this.potsService.getPotsForChild(childId, user);
   }
@@ -69,10 +71,13 @@ export class PotsResolver {
   @Roles(Role.PARENT)
   async createPot(
     @CurrentUser() creator: JwtPayload,
-    @Args('childId') childId: string,
+    @Args('childId', { type: () => ID }) childId: string,
     @Args('title') title: string,
     @Args('targetAmount') targetAmount: number,
-    @Args('withdrawalPolicy') withdrawalPolicy: WithdrawalPolicy,
+    // type: () => WithdrawalPolicy : typage explicite requis car reflect-metadata
+    // infère String pour les args enum, ce qui génère `String!` au lieu de
+    // `WithdrawalPolicy!` dans le schéma GraphQL (même classe de bug que les ID).
+    @Args('withdrawalPolicy', { type: () => WithdrawalPolicy }) withdrawalPolicy: WithdrawalPolicy,
   ): Promise<Pot> {
     return this.potsService.createPot({
       childId,
@@ -133,7 +138,7 @@ export class PotsResolver {
   @Mutation(() => Transaction)
   async withdrawFromPot(
     @CurrentUser() user: JwtPayload,
-    @Args('potId') potId: string,
+    @Args('potId', { type: () => ID }) potId: string,
     @Args('amount') amount: number,
   ): Promise<Transaction> {
     return this.potsService.withdrawFromPot({
