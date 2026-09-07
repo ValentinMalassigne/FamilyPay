@@ -49,6 +49,14 @@ services:
     depends_on:
       - backend
     environment:
+      # GRAPHQL_URL (server-side) : URL du backend GraphQL vue DEPUIS le
+      # container nextjs, sur le réseau Docker interne. En compose, les
+      # services communiquent via leur nom de service → "backend" résout vers
+      # l'IP du container backend. "localhost" ici désignerait le container
+      # nextjs lui-même (où tourne Next.js, pas le backend) → ECONNREFUSED.
+      # Valeur littérale (pas d'interpolation .env) : c'est une constante du
+      # réseau compose, pas une config environnement-spécifique.
+      GRAPHQL_URL: http://backend:3000/graphql
       # NEXT_PUBLIC_* est lue au build Next.js et baked dans le bundle client.
       # Elle doit pointer vers une URL accessible depuis le navigateur (pas
       # depuis le réseau Docker) → http://localhost:3000/graphql en dev local.
