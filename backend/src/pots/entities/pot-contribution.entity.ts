@@ -60,7 +60,13 @@ export class PotContribution {
   // TypeORM 1.x n'infère pas le type SQL depuis `string | null` (il tombe sur
   // `Object`, non supporté par PostgreSQL). On déclare donc `type: 'varchar'`
   // explicitement, comme pour les autres colonnes text de l'entité.
-  @Field({ nullable: true })
+  //
+  // Côté GraphQL, @Field() sans type explicite s'appuie sur reflect-metadata,
+  // qui ne sait pas représenter une union `string | null` (il voit `Object`).
+  // On passe donc `() => String` explicitement + `nullable: true` pour autoriser
+  // null dans le schéma GraphQL. Les autres champs nullable (label?, category?)
+  // utilisent le modificateur `?` optionnel que reflect-metadata gère correctement.
+  @Field(() => String, { nullable: true })
   @Column({ type: 'varchar', nullable: true })
   contributorName: string | null;
 
