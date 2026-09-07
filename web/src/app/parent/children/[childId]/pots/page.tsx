@@ -83,6 +83,20 @@ export default async function PotsPage({
                 }}
               >
                 <strong>{pot.title}</strong>
+                {pot.status === 'CLOSED' && (
+                  <span
+                    style={{
+                      marginLeft: '0.5rem',
+                      padding: '0.1rem 0.4rem',
+                      background: '#eee',
+                      borderRadius: '4px',
+                      fontSize: '0.8rem',
+                      color: '#666',
+                    }}
+                  >
+                    Clôturée
+                  </span>
+                )}
                 <div style={{ marginTop: '0.5rem' }}>
                   {pot.currentAmount.toFixed(2)} € / {pot.targetAmount.toFixed(2)} €
                   {' '}({pct.toFixed(0)} %)
@@ -90,17 +104,21 @@ export default async function PotsPage({
                 <div style={{ color: '#888' }}>
                   Politique : {pot.withdrawalPolicy}
                 </div>
-                <div style={{ marginTop: '0.5rem' }}>
-                  <Link href={`/donate/${pot.publicToken}`}>
-                    Lien public de don
-                  </Link>
-                </div>
-                <div style={{ marginTop: '0.5rem' }}>
-                  <WithdrawPotButton
-                    potId={pot.id}
-                    currentAmount={pot.currentAmount}
-                  />
-                </div>
+                {pot.status === 'OPEN' && (
+                  <>
+                    <div style={{ marginTop: '0.5rem' }}>
+                      <Link href={`/donate/${pot.publicToken}`}>
+                        Lien public de don
+                      </Link>
+                    </div>
+                    <div style={{ marginTop: '0.5rem' }}>
+                      <WithdrawPotButton
+                        potId={pot.id}
+                        currentAmount={pot.currentAmount}
+                      />
+                    </div>
+                  </>
+                )}
               </li>
             );
           })}

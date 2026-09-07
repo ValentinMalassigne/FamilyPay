@@ -130,6 +130,10 @@ export const ADD_MANUAL_EXPENSE_MUTATION = /* GraphQL */ `
 // Type WithdrawalPolicy : politique de retrait d'une cagnotte (enum backend).
 export type WithdrawalPolicy = 'ANYTIME' | 'WHEN_FULL' | 'PARENT_ONLY';
 
+// Type PotStatus : état d'une cagnotte (enum backend). OPEN = contributions
+// acceptées ; CLOSED = clôturée après un retrait, plus de contribution.
+export type PotStatus = 'OPEN' | 'CLOSED';
+
 export type Pot = {
   id: string;
   title: string;
@@ -138,6 +142,7 @@ export type Pot = {
   publicToken: string;
   hiddenFrom: string[];
   withdrawalPolicy: WithdrawalPolicy;
+  status: PotStatus;
 };
 
 // Query pots : liste les cagnottes d'un enfant.
@@ -151,6 +156,7 @@ export const POTS_QUERY = /* GraphQL */ `
       publicToken
       hiddenFrom
       withdrawalPolicy
+      status
     }
   }
 `;
@@ -175,6 +181,7 @@ export const CREATE_POT_MUTATION = /* GraphQL */ `
       currentAmount
       publicToken
       withdrawalPolicy
+      status
     }
   }
 `;
