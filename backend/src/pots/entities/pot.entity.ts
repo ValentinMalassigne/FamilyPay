@@ -34,6 +34,21 @@ export enum WithdrawalPolicy {
 registerEnumType(WithdrawalPolicy, { name: 'WithdrawalPolicy' });
 
 /*
+ * PotStatus : état d'une cagnotte (OPEN | CLOSED).
+ * OPEN  : contributions acceptées (enfant, parent, ou don public via le lien).
+ * CLOSED : plus aucune contribution possible. La cagnotte passe à CLOSED
+ *          automatiquement après un retrait (la cagnotte se vide en une fois,
+ *          puis se clôture — voir withdrawFromPot dans pots.service.ts).
+ *
+ * registerEnumType : expose l'enum côté schéma GraphQL sous le nom 'PotStatus'.
+ */
+export enum PotStatus {
+  OPEN = 'OPEN',
+  CLOSED = 'CLOSED',
+}
+registerEnumType(PotStatus, { name: 'PotStatus' });
+
+/*
  * Pot : entité représentant une cagnotte d'épargne d'un enfant.
  *
  * @Entity() + @ObjectType() : mappe sur la table PostgreSQL "pot" ET expose
@@ -139,4 +154,19 @@ export class Pot {
   @Field(() => WithdrawalPolicy)
   @Column({ type: 'enum', enum: WithdrawalPolicy })
   withdrawalPolicy: WithdrawalPolicy;
+
+  /*
+   * status : état de la cagnotte (OPEN par défaut, CLOSED après un retrait).
+   * @Column({ type: 'enum', enum: PotStatus, default: PotStatus.OPEN }) :
+   *   enum natif PostgreSQL, valeur par défaut OPEN à la création.
+   *   TypeORM (synchronize: true en dev) ajoute automatiquement la colonne au
+   *   prochain démarrage — pas de migration à écrire.
+   * @Field(() => PotStatus) : exposé en GraphQL comme `status: PotStatus!`.
+   *
+   * Une cagnotte CLOSED n'accepte plus aucune contribution (enfant, parent ou
+   * don public) — vérifié dans contributeToPotPublic et withdrawFromPot.
+   */
+  @Field(() => PotStatus)
+  @Column({ type: 'enum', enum: PotStatus, default: PotStatus.OPEN })
+  status: PotStatus;
 }
