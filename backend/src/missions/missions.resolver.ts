@@ -1,4 +1,6 @@
-import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
+// ID : voir users.resolver.ts — typage explicite requis pour les args d'identifiant
+// (childId, missionId ici) afin de générer `ID!` et non `String!` dans le schéma GraphQL.
 import { UseGuards } from '@nestjs/common';
 import { MissionsService } from './missions.service.js';
 import { Mission } from './entities/mission.entity.js';
@@ -40,7 +42,7 @@ export class MissionsResolver {
   @Query(() => [Mission])
   async missions(
     @CurrentUser() user: JwtPayload,
-    @Args('childId') childId: string,
+    @Args('childId', { type: () => ID }) childId: string,
   ): Promise<Mission[]> {
     return this.missionsService.getMissionsForChild(childId, user);
   }
@@ -61,7 +63,7 @@ export class MissionsResolver {
   @Roles(Role.PARENT)
   async createMission(
     @CurrentUser() creator: JwtPayload,
-    @Args('childId') childId: string,
+    @Args('childId', { type: () => ID }) childId: string,
     @Args('title') title: string,
     @Args('reward') reward: number,
   ): Promise<Mission> {
@@ -88,7 +90,7 @@ export class MissionsResolver {
   @Mutation(() => Mission)
   async markMissionDone(
     @CurrentUser() user: JwtPayload,
-    @Args('missionId') missionId: string,
+    @Args('missionId', { type: () => ID }) missionId: string,
   ): Promise<Mission> {
     return this.missionsService.markMissionDone(missionId, user);
   }
@@ -112,7 +114,7 @@ export class MissionsResolver {
   @Roles(Role.PARENT)
   async validateMission(
     @CurrentUser() user: JwtPayload,
-    @Args('missionId') missionId: string,
+    @Args('missionId', { type: () => ID }) missionId: string,
     @Args('approve') approve: boolean,
   ): Promise<Mission> {
     return this.missionsService.validateMission(missionId, approve, user);

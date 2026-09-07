@@ -1,4 +1,6 @@
-import { Args, Mutation, Query, Resolver, Subscription } from '@nestjs/graphql';
+import { Args, ID, Mutation, Query, Resolver, Subscription } from '@nestjs/graphql';
+// ID : voir users.resolver.ts — typage explicite requis pour les args d'identifiant
+// (childId ici) afin de générer `ID!` et non `String!` dans le schéma GraphQL.
 import { UseGuards, Inject, ForbiddenException } from '@nestjs/common';
 import { TransactionsService } from './transactions.service.js';
 import { Transaction } from './entities/transaction.entity.js';
@@ -58,7 +60,7 @@ export class TransactionsResolver {
   @Query(() => [Transaction])
   async transactions(
     @CurrentUser() user: JwtPayload,
-    @Args('childId') childId: string,
+    @Args('childId', { type: () => ID }) childId: string,
   ): Promise<Transaction[]> {
     // Vérifier que l'utilisateur a le droit de voir les transactions de cet enfant.
     // Un parent peut voir les transactions de n'importe quel enfant de SA famille.
@@ -110,7 +112,7 @@ export class TransactionsResolver {
   @Mutation(() => Transaction)
   async addManualExpense(
     @CurrentUser() user: JwtPayload,
-    @Args('childId') childId: string,
+    @Args('childId', { type: () => ID }) childId: string,
     @Args('amount') amount: number,
     @Args('label') label: string,
     @Args('category', { nullable: true }) category?: string,
@@ -152,7 +154,7 @@ export class TransactionsResolver {
   @Roles(Role.PARENT)
   async rechargeChildAccount(
     @CurrentUser() user: JwtPayload,
-    @Args('childId') childId: string,
+    @Args('childId', { type: () => ID }) childId: string,
     @Args('amount') amount: number,
   ): Promise<Transaction> {
     return this.transactionsService.rechargeChildAccount({
@@ -191,7 +193,7 @@ export class TransactionsResolver {
       return payload.balanceUpdated.userId === variables.childId;
     },
   })
-  balanceUpdated(@Args('childId') childId: string) {
+  balanceUpdated(@Args('childId', { type: () => ID }) childId: string) {
     // Retourne un AsyncIterator pour le topic BALANCE_UPDATED_{childId}.
     // Quand un événement est publié sur ce topic, le client reçoit la donnée.
     return this.pubSub.asyncIterator(`BALANCE_UPDATED_${childId}`);
@@ -221,7 +223,7 @@ export class TransactionsResolver {
       return payload.transactionAdded.childId === variables.childId;
     },
   })
-  transactionAdded(@Args('childId') childId: string) {
+  transactionAdded(@Args('childId', { type: () => ID }) childId: string) {
     return this.pubSub.asyncIterator(`TRANSACTION_ADDED_${childId}`);
   }
 }
