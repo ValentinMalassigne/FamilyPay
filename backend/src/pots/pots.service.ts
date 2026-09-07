@@ -7,7 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
-import { Pot, WithdrawalPolicy } from './entities/pot.entity.js';
+import { Pot, WithdrawalPolicy, PotStatus } from './entities/pot.entity.js';
 import { PotContribution } from './entities/pot-contribution.entity.js';
 import { TransactionsService } from '../transactions/transactions.service.js';
 import { UsersService } from '../users/users.service.js';
@@ -161,16 +161,21 @@ export class PotsService {
    *
    * Règles métier (PROJECT_CONTEXT.md §4) :
    *  - Le montant doit être positif.
+   *  - La cagnotte doit être OPEN (status) — une cagnotte CLOSED n'accepte plus
+   *    aucune contribution, même publique.
    *  - Le montant est plafonné à targetAmount - currentAmount (pas de
    *    dépassement de l'objectif).
    *  - On crée une PotContribution (isPublicDonation = true).
-   *  - On crée une Transaction de type POT_CONTRIBUTION sur le compte de
-   *    l'enfant (crédit, amount positif) via TransactionsService.addTransaction,
-   *    ce qui met à jour le solde et publie l'événement balanceUpdated.
    *  - On met à jour currentAmount du pot.
    *
-   * @throws BadRequestException si amount <= 0 ou si le montant dépasse la
-   *         place restante dans la cagnotte.
+   * IMPORTANT : une cagnotte est un solde SÉPARÉ du solde principal de l'enfant.
+   * La contribution ne crée PAS de Transaction sur le compte principal — elle
+   * ne fait qu'augmenter pot.currentAmount et enregistrer la PotContribution.
+   * L'argent n'est transféré vers le solde principal qu'au moment du retrait
+   * (voir withdrawFromPot).
+   *
+   * @throws BadRequestException si amount <= 0, si la cagnotte est clôturée,
+   *         ou si le montant dépasse la place restante dans la cagnotte.
    */
   async contributeToPotPublic(params: {
     publicToken: string;
@@ -183,6 +188,13 @@ export class PotsService {
 
     const pot = await this.getPotByPublicToken(params.publicToken);
 
+    // Une cagnotte clôturée n'accepte plus de contributions.
+    if (pot.status === PotStatus.CLOSED) {
+      throw new BadRequestException(
+        'Cagnotte clôturée, plus de contributions possibles',
+      );
+    }
+
     // Plafond : pas de dépassement de l'objectif de la cagnotte.
     const remaining = pot.targetAmount - pot.currentAmount;
     if (params.amount > remaining) {
@@ -191,18 +203,8 @@ export class PotsService {
       );
     }
 
-    // Créer la Transaction POT_CONTRIBUTION (crédit vers le solde de l'enfant).
-    // addTransaction met à jour le solde (balance += amount) et publie
-    // l'événement balanceUpdated pour la subscription temps réel.
-    await this.transactionsService.addTransaction({
-      childId: pot.childId,
-      amount: params.amount,
-      type: TransactionType.POT_CONTRIBUTION,
-      label: `Contribution cagnotte « ${pot.title} »`,
-      createdBy: CreatedBy.SYSTEM,
-    });
-
-    // Mettre à jour currentAmount du pot.
+    // La cagnotte est un solde séparé : on ne crée PAS de Transaction sur le
+    // solde principal. On se contente d'augmenter currentAmount du pot.
     pot.currentAmount += params.amount;
     await this.potRepository.save(pot);
 
@@ -229,19 +231,29 @@ export class PotsService {
    *  - parent → toujours autorisé.
    *  - enfant → vérifier la policy.
    *
+   * Règle métier — retrait total + clôture automatique (PROJECT_CONTEXT.md §4) :
+   *  - Une cagnotte se vide en une seule fois : amount doit valoir exactement
+   *    currentAmount (pas de retrait partiel, pas d'argent bloqué).
+   *  - L'argent quitte la cagnotte pour ENTRER dans le solde principal : la
+   *    Transaction POT_WITHDRAWAL est un CRÉDIT (amount positif), pas un débit.
+   *  - Après le retrait, la cagnotte est CLÔTURÉE (status → CLOSED) : plus
+   *    aucune contribution n'est acceptée (enfant, parent ou don public).
+   *  - currentAmount retombe à 0.
+   *
    * Le retrait :
-   *  1. Vérifie que amount > 0 et amount <= currentAmount (on ne retire pas
-   *     plus que ce que la cagnotte contient).
-   *  2. Vérifie la policy si l'appelant est un enfant.
-   *  3. Diminue currentAmount du pot.
-   *  4. Crée une Transaction POT_WITHDRAWAL (débit, amount négatif) via
+   *  1. Vérifie que la cagnotte n'est pas déjà CLOSED.
+   *  2. Vérifie que amount > 0 et amount === currentAmount (retrait total).
+   *  3. Vérifie la policy si l'appelant est un enfant.
+   *  4. Met currentAmount à 0 et status à CLOSED.
+   *  5. Crée une Transaction POT_WITHDRAWAL (crédit, amount positif) via
    *     TransactionsService.addTransaction, ce qui met à jour le solde
-   *     (balance -= amount) et publie balanceUpdated.
+   *     (balance += amount) et publie balanceUpdated.
    *
    * @returns la Transaction créée (le schéma §6 spécifie withdrawFromPot: Transaction!).
    *
+   * @throws BadRequestException si la cagnotte est déjà clôturée, si amount <= 0
+   *         ou si amount != currentAmount (retrait partiel interdit).
    * @throws ForbiddenException si l'enfant n'est pas autorisé par la policy.
-   * @throws BadRequestException si amount <= 0 ou > currentAmount.
    */
   async withdrawFromPot(params: {
     potId: string;
@@ -259,9 +271,15 @@ export class PotsService {
       throw new NotFoundException('Cagnotte non trouvée');
     }
 
-    if (params.amount > pot.currentAmount) {
+    // Une cagnotte déjà clôturée ne peut plus faire l'objet d'un retrait.
+    if (pot.status === PotStatus.CLOSED) {
+      throw new BadRequestException('Cagnotte déjà clôturée');
+    }
+
+    // Retrait total obligatoire : une cagnotte se vide en une fois.
+    if (params.amount !== pot.currentAmount) {
       throw new BadRequestException(
-        `Montant supérieur au contenu de la cagnotte (${pot.currentAmount}€)`,
+        `Le retrait doit être total (${pot.currentAmount}€ disponibles)`,
       );
     }
 
@@ -302,21 +320,150 @@ export class PotsService {
       }
     }
 
-    // Diminuer currentAmount du pot.
-    pot.currentAmount -= params.amount;
+    // Vider la cagnotte et la clôturer. Le currentAmount retombe à 0 (plus
+    // d'argent bloqué) et le status passe à CLOSED (plus de contribution).
+    pot.currentAmount = 0;
+    pot.status = PotStatus.CLOSED;
     await this.potRepository.save(pot);
 
-    // Créer la Transaction POT_WITHDRAWAL (débit sur le solde).
-    // addTransaction vérifie que le solde ne passe pas négatif et publie
+    // Créer la Transaction POT_WITHDRAWAL : l'argent quitte la cagnotte pour
+    // ENTRER dans le solde principal, donc c'est un CRÉDIT (amount positif).
+    // addTransaction met à jour le solde (balance += amount) et publie
     // l'événement balanceUpdated. On retourne la Transaction créée (schéma §6).
     const transaction = await this.transactionsService.addTransaction({
       childId: pot.childId,
-      amount: -params.amount,
+      amount: params.amount,
       type: TransactionType.POT_WITHDRAWAL,
       label: `Retrait cagnotte « ${pot.title} »`,
       createdBy: isParent ? CreatedBy.PARENT : CreatedBy.CHILD,
     });
 
     return transaction;
+  }
+
+  /*
+   * updatePot : un parent modifie une cagnotte existante.
+   *
+   * Règles métier (décisions de design) :
+   *  - Seule une cagnotte OPEN est éditable. Une cagnotte CLOSED (après retrait)
+   *    n'est plus modifiable — on ne peut que la supprimer si elle est vide.
+   *  - title, si fourni, doit être non vide.
+   *  - targetAmount, si fourni, doit être > 0 et >= currentAmount (on ne peut
+   *    pas baisser l'objectif sous le montant déjà accumulé).
+   *  - withdrawalPolicy, si fourni, est déjà validé par l'enum GraphQL.
+   *  - Les champs non fournis (undefined) ne sont pas modifiés (édition
+   *    partielle).
+   *
+   * @throws NotFoundException si la cagnotte n'existe pas.
+   * @throws ForbiddenException si la cagnotte n'appartient pas à la famille
+   *         du parent.
+   * @throws BadRequestException si la cagnotte est CLOSED, si title est vide,
+   *         ou si targetAmount est invalide.
+   */
+  async updatePot(params: {
+    potId: string;
+    title?: string;
+    targetAmount?: number;
+    withdrawalPolicy?: WithdrawalPolicy;
+    requester: JwtPayload;
+  }): Promise<Pot> {
+    const pot = await this.potRepository.findOne({
+      where: { id: params.potId },
+    });
+    if (!pot) {
+      throw new NotFoundException('Cagnotte non trouvée');
+    }
+
+    // Vérifier l'appartenance famille : on charge l'enfant propriétaire et on
+    // compare son familyId à celui du parent appelant (même pattern que
+    // createPot / withdrawFromPot).
+    const child = await this.usersService.findById(pot.childId);
+    if (!child || child.familyId !== params.requester.familyId) {
+      throw new ForbiddenException(
+        "Vous n'avez pas le droit de modifier cette cagnotte",
+      );
+    }
+
+    // Une cagnotte clôturée n'est plus éditable.
+    if (pot.status === PotStatus.CLOSED) {
+      throw new BadRequestException(
+        'Une cagnotte clôturée ne peut plus être modifiée',
+      );
+    }
+
+    if (params.title !== undefined && params.title.trim() === '') {
+      throw new BadRequestException('Le titre ne peut pas être vide');
+    }
+
+    if (params.targetAmount !== undefined) {
+      if (params.targetAmount <= 0) {
+        throw new BadRequestException('Le montant objectif doit être positif');
+      }
+      // On ne peut pas baisser l'objectif sous le montant déjà accumulé.
+      if (params.targetAmount < pot.currentAmount) {
+        throw new BadRequestException(
+          `L'objectif ne peut pas être inférieur au montant déjà accumulé (${pot.currentAmount}€)`,
+        );
+      }
+    }
+
+    // Appliquer uniquement les champs fournis (édition partielle).
+    if (params.title !== undefined) pot.title = params.title.trim();
+    if (params.targetAmount !== undefined) pot.targetAmount = params.targetAmount;
+    if (params.withdrawalPolicy !== undefined) {
+      pot.withdrawalPolicy = params.withdrawalPolicy;
+    }
+
+    return this.potRepository.save(pot);
+  }
+
+  /*
+   * deletePot : un parent supprime une cagnotte.
+   *
+   * Règles métier (décisions de design) :
+   *  - On ne peut pas supprimer une cagnotte qui contient de l'argent
+   *    (currentAmount > 0 → BadRequestException). Le parent doit d'abord
+   *    retirer l'argent (withdrawFromPot), ce qui vide la cagnotte et la
+   *    clôture.
+   *  - Une cagnotte vide (OPEN ou CLOSED) peut être supprimée.
+   *  - Les PotContribution associées sont supprimées en cascade manuelle avant
+   *    le pot (pas de cascade DB automatique sur la relation).
+   *
+   * @throws NotFoundException si la cagnotte n'existe pas.
+   * @throws ForbiddenException si la cagnotte n'appartient pas à la famille.
+   * @throws BadRequestException si currentAmount > 0.
+   */
+  async deletePot(params: {
+    potId: string;
+    requester: JwtPayload;
+  }): Promise<boolean> {
+    const pot = await this.potRepository.findOne({
+      where: { id: params.potId },
+    });
+    if (!pot) {
+      throw new NotFoundException('Cagnotte non trouvée');
+    }
+
+    const child = await this.usersService.findById(pot.childId);
+    if (!child || child.familyId !== params.requester.familyId) {
+      throw new ForbiddenException(
+        "Vous n'avez pas le droit de supprimer cette cagnotte",
+      );
+    }
+
+    // On ne peut pas supprimer une cagnotte qui contient encore de l'argent.
+    if (pot.currentAmount > 0) {
+      throw new BadRequestException(
+        'Impossible de supprimer une cagnotte qui contient de l\'argent — retirez l\'argent d\'abord',
+      );
+    }
+
+    // Cascade manuelle : supprimer d'abord les contributions associées, puis
+    // le pot lui-même. On utilise delete() (par critère) plutôt que remove()
+    // (par entité) pour éviter de charger chaque contribution.
+    await this.potContributionRepository.delete({ potId: pot.id });
+    await this.potRepository.delete({ id: pot.id });
+
+    return true;
   }
 }

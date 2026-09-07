@@ -7,7 +7,7 @@ import {
   type Mission,
   type ChildAccountSummary,
 } from '@/lib/queries';
-import { CreateMissionForm, ValidateMissionButtons } from './MissionActions';
+import { CreateMissionForm, ValidateMissionButtons, EditMissionForm, DeleteMissionButton } from './MissionActions';
 
 // Liste des missions d'un enfant (Server Component, auth JWT parent).
 //
@@ -110,6 +110,8 @@ export default async function MissionsPage({
               {mission.status === 'DONE_BY_CHILD' && (
                 <ValidateMissionButtons missionId={mission.id} />
               )}
+              <EditMissionForm mission={mission} />
+              <DeleteMissionButton missionId={mission.id} />
             </li>
           ))}
         </ul>

@@ -223,4 +223,146 @@ export class MissionsService {
 
     return mission;
   }
+
+  /*
+   * updateMission : un parent modifie une mission (titre, récompense, statut).
+   *
+   * Tous les statuts sont éditables (le parent peut définir n'importe quel
+   * MissionStatus — pas de restriction de transition). Le statut déclenche
+   * des effets de bord :
+   *
+   *  - status → VALIDATED (et mission non déjà VALIDATED) :
+   *    Crée une Transaction MISSION_REWARD (même comportement que
+   *    validateMission) et set validatedAt. La récompense créditée est celle
+   *    du mission.reward AU MOMENT DE LA VALIDATION.
+   *  - status → DONE_BY_CHILD : set completedAt (si pas déjà set).
+   *  - status → PENDING : clear completedAt et validatedAt (retour à l'état
+   *    initial).
+   *  - status → REJECTED : set validatedAt (si pas déjà set).
+   *
+   * Revenir en arrière depuis VALIDATED ne reverse PAS la transaction
+   * MISSION_REWARD déjà créée (irréversible — trop complexe, non demandé).
+   * Modifier reward sur une mission déjà VALIDATED n'ajuste PAS la transaction
+   * existante (irréversible).
+   *
+   * @throws NotFoundException si la mission n'existe pas.
+   * @throws ForbiddenException si la mission n'appartient pas à la famille.
+   * @throws BadRequestException si title est vide ou si reward <= 0.
+   */
+  async updateMission(params: {
+    missionId: string;
+    title?: string;
+    reward?: number;
+    status?: MissionStatus;
+    requester: JwtPayload;
+  }): Promise<Mission> {
+    const mission = await this.missionRepository.findOne({
+      where: { id: params.missionId },
+    });
+    if (!mission) {
+      throw new NotFoundException('Mission non trouvée');
+    }
+
+    // Vérifier l'appartenance famille via l'enfant propriétaire de la mission.
+    const child = await this.usersService.findById(mission.childId);
+    if (!child || child.familyId !== params.requester.familyId) {
+      throw new ForbiddenException(
+        "Vous n'avez pas le droit de modifier cette mission",
+      );
+    }
+
+    if (params.title !== undefined && params.title.trim() === '') {
+      throw new BadRequestException('Le titre ne peut pas être vide');
+    }
+
+    if (params.reward !== undefined && params.reward <= 0) {
+      throw new BadRequestException('La récompense doit être positive');
+    }
+
+    // Appliquer les champs d'édition partielle.
+    if (params.title !== undefined) mission.title = params.title.trim();
+    if (params.reward !== undefined) mission.reward = params.reward;
+
+    // Gérer les effets de bord du changement de statut.
+    if (params.status !== undefined) {
+      const wasValidated = mission.status === MissionStatus.VALIDATED;
+
+      if (
+        params.status === MissionStatus.VALIDATED &&
+        !wasValidated
+      ) {
+        // Transition vers VALIDATED : créer la Transaction MISSION_REWARD
+        // (même comportement que validateMission) + set validatedAt.
+        mission.status = MissionStatus.VALIDATED;
+        mission.validatedAt = new Date();
+        await this.missionRepository.save(mission);
+
+        await this.transactionsService.addTransaction({
+          childId: mission.childId,
+          amount: mission.reward,
+          type: TransactionType.MISSION_REWARD,
+          label: `Récompense mission « ${mission.title} »`,
+          createdBy: CreatedBy.PARENT,
+        });
+      } else {
+        // Changement de statut sans transition vers VALIDATED.
+        mission.status = params.status;
+
+        // Gérer les timestamps selon le nouveau statut.
+        if (params.status === MissionStatus.DONE_BY_CHILD) {
+          if (!mission.completedAt) {
+            mission.completedAt = new Date();
+          }
+        } else if (params.status === MissionStatus.PENDING) {
+          // Retour à l'état initial : clear les timestamps.
+          mission.completedAt = null;
+          mission.validatedAt = null;
+        } else if (params.status === MissionStatus.REJECTED) {
+          if (!mission.validatedAt) {
+            mission.validatedAt = new Date();
+          }
+        }
+
+        await this.missionRepository.save(mission);
+      }
+    } else {
+      // Pas de changement de statut : sauvegarder les autres champs modifiés.
+      await this.missionRepository.save(mission);
+    }
+
+    return mission;
+  }
+
+  /*
+   * deleteMission : un parent supprime une mission.
+   *
+   * Aucune restriction de statut : la mission est supprimée quel que soit son
+   * état. La Transaction MISSION_REWARD éventuellement créée lors d'une
+   * validation reste (elle ne dépend pas de la mission en DB — c'est une
+   * transaction sur le compte de l'enfant).
+   *
+   * @throws NotFoundException si la mission n'existe pas.
+   * @throws ForbiddenException si la mission n'appartient pas à la famille.
+   */
+  async deleteMission(params: {
+    missionId: string;
+    requester: JwtPayload;
+  }): Promise<boolean> {
+    const mission = await this.missionRepository.findOne({
+      where: { id: params.missionId },
+    });
+    if (!mission) {
+      throw new NotFoundException('Mission non trouvée');
+    }
+
+    const child = await this.usersService.findById(mission.childId);
+    if (!child || child.familyId !== params.requester.familyId) {
+      throw new ForbiddenException(
+        "Vous n'avez pas le droit de supprimer cette mission",
+      );
+    }
+
+    await this.missionRepository.delete({ id: params.missionId });
+    return true;
+  }
 }

@@ -171,4 +171,97 @@ export class AllowancesService {
       }
     }
   }
+
+  /*
+   * updateAllowanceRule : un parent modifie une règle de virement (édition
+   * partielle).
+   *
+   * Règles métier (décisions de design) :
+   *  - amount, si fourni, doit être > 0.
+   *  - frequency, si fourni, recalcule nextRunAt = maintenant + nouvelle
+   *    fréquence (WEEKLY = +7 jours, MONTHLY = +30 jours). Le prochain cycle
+   *    du cron reprendra à partir de cette nouvelle date.
+   *  - Si seule amount ou active change, on GARDE le nextRunAt actuel (pas de
+   *    reset — on ne veut pas avancer ni reculer l'échéance pour un simple
+   *    changement de montant).
+   *  - active, si fourni, est un boolean (suspendre / réactiver).
+   *
+   * @throws NotFoundException si la règle n'existe pas.
+   * @throws ForbiddenException si la règle n'appartient pas à la famille.
+   * @throws BadRequestException si amount <= 0.
+   */
+  async updateAllowanceRule(params: {
+    ruleId: string;
+    amount?: number;
+    frequency?: AllowanceFrequency;
+    active?: boolean;
+    requester: JwtPayload;
+  }): Promise<AllowanceRule> {
+    const rule = await this.allowanceRuleRepository.findOne({
+      where: { id: params.ruleId },
+    });
+    if (!rule) {
+      throw new NotFoundException('Règle de virement non trouvée');
+    }
+
+    // Vérifier l'appartenance famille via l'enfant bénéficiaire.
+    const child = await this.usersService.findById(rule.childId);
+    if (!child || child.familyId !== params.requester.familyId) {
+      throw new ForbiddenException(
+        "Vous n'avez pas le droit de modifier ce virement",
+      );
+    }
+
+    if (params.amount !== undefined && params.amount <= 0) {
+      throw new BadRequestException('Le montant doit être positif');
+    }
+
+    // Appliquer les champs d'édition partielle.
+    if (params.amount !== undefined) rule.amount = params.amount;
+    if (params.active !== undefined) rule.active = params.active;
+
+    // Si la fréquence change, recalculer nextRunAt = maintenant + nouvelle
+    // fréquence. Si seule amount/active change, on garde le nextRunAt actuel.
+    if (params.frequency !== undefined) {
+      rule.frequency = params.frequency;
+      const days = params.frequency === AllowanceFrequency.WEEKLY ? 7 : 30;
+      const nextRunAt = new Date();
+      nextRunAt.setDate(nextRunAt.getDate() + days);
+      rule.nextRunAt = nextRunAt;
+    }
+
+    return this.allowanceRuleRepository.save(rule);
+  }
+
+  /*
+   * deleteAllowanceRule : un parent supprime une règle de virement.
+   *
+   * Aucune restriction : la règle est supprimée quel que soit son état (active
+   * ou non). Les Transactions ALLOWANCE déjà créées par le cron restent (ce
+   * sont des transactions sur le compte de l'enfant, indépendantes de la règle).
+   *
+   * @throws NotFoundException si la règle n'existe pas.
+   * @throws ForbiddenException si la règle n'appartient pas à la famille.
+   */
+  async deleteAllowanceRule(params: {
+    ruleId: string;
+    requester: JwtPayload;
+  }): Promise<boolean> {
+    const rule = await this.allowanceRuleRepository.findOne({
+      where: { id: params.ruleId },
+    });
+    if (!rule) {
+      throw new NotFoundException('Règle de virement non trouvée');
+    }
+
+    const child = await this.usersService.findById(rule.childId);
+    if (!child || child.familyId !== params.requester.familyId) {
+      throw new ForbiddenException(
+        "Vous n'avez pas le droit de supprimer ce virement",
+      );
+    }
+
+    await this.allowanceRuleRepository.delete({ id: params.ruleId });
+    return true;
+  }
 }
