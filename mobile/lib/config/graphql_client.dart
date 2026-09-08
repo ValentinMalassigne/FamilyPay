@@ -96,6 +96,7 @@ class FamilyPayApp extends StatelessWidget {
       client: client,
       child: MaterialApp(
         title: 'FamilyPay',
+        debugShowCheckedModeBanner: false,
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
           useMaterial3: true,
