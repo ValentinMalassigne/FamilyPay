@@ -12,6 +12,18 @@ import {
   type WithdrawalPolicy,
   type Pot,
 } from '@/lib/queries';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 // Actions sur les cagnottes (Client Component) : création + retrait.
 //
@@ -68,57 +80,63 @@ export function CreatePotForm({
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      style={{
-        marginTop: '1.5rem',
-        border: '1px solid #ddd',
-        borderRadius: '8px',
-        padding: '1rem',
-      }}
-    >
-      <h3>Créer une cagnotte</h3>
-      <label>
-        Titre :
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          required
-          style={{ display: 'block', margin: '0.5rem 0' }}
-        />
-      </label>
-      <label>
-        Objectif (€) :
-        <input
-          type="number"
-          step="0.01"
-          min="0"
-          value={targetAmount}
-          onChange={(e) => setTargetAmount(e.target.value)}
-          required
-          style={{ display: 'block', margin: '0.5rem 0' }}
-        />
-      </label>
-      <label>
-        Politique de retrait :
-        <select
-          value={policy}
-          onChange={(e) => setPolicy(e.target.value as WithdrawalPolicy)}
-          style={{ display: 'block', margin: '0.5rem 0' }}
-        >
-          {POLICIES.map((p) => (
-            <option key={p} value={p}>
-              {POLICY_LABELS[p]}
-            </option>
-          ))}
-        </select>
-      </label>
-      {error && <p style={{ color: '#c00' }}>{error}</p>}
-      <button type="submit" disabled={loading}>
-        {loading ? 'Création…' : 'Créer la cagnotte'}
-      </button>
-    </form>
+    <Card className="max-w-md">
+      <CardHeader>
+        <CardTitle className="text-base">Créer une cagnotte</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="create-pot-title">Titre</Label>
+            <Input
+              id="create-pot-title"
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="create-pot-target">Objectif (€)</Label>
+            <Input
+              id="create-pot-target"
+              type="number"
+              step="0.01"
+              min="0"
+              value={targetAmount}
+              onChange={(e) => setTargetAmount(e.target.value)}
+              required
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label>Politique de retrait</Label>
+            <Select
+              value={policy}
+              onValueChange={(val) => setPolicy(val as WithdrawalPolicy)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {POLICIES.map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {POLICY_LABELS[p]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          <Button type="submit" disabled={loading}>
+            {loading ? 'Création…' : 'Créer la cagnotte'}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -148,15 +166,21 @@ export function WithdrawPotButton({
   }
 
   return (
-    <div>
-      <button
+    <div className="flex flex-col gap-2">
+      <Button
         type="button"
+        variant="secondary"
+        size="sm"
         onClick={handleWithdraw}
         disabled={loading || currentAmount <= 0}
       >
         {loading ? 'Retrait…' : `Retirer ${currentAmount.toFixed(2)} €`}
-      </button>
-      {error && <p style={{ color: '#c00' }}>{error}</p>}
+      </Button>
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 }
@@ -206,76 +230,87 @@ export function EditPotForm({ pot }: { pot: Pot }) {
 
   if (!editing) {
     return (
-      <div style={{ marginTop: '0.5rem' }}>
-        <button type="button" onClick={() => setEditing(true)}>
-          Modifier
-        </button>
-      </div>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => setEditing(true)}
+      >
+        Modifier
+      </Button>
     );
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      style={{
-        marginTop: '0.5rem',
-        border: '1px solid #ddd',
-        borderRadius: '8px',
-        padding: '1rem',
-      }}
-    >
-      <h4>Modifier la cagnotte</h4>
-      <label>
-        Titre :
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          required
-          style={{ display: 'block', margin: '0.5rem 0' }}
-        />
-      </label>
-      <label>
-        Objectif (€) :
-        <input
-          type="number"
-          step="0.01"
-          min="0"
-          value={targetAmount}
-          onChange={(e) => setTargetAmount(e.target.value)}
-          style={{ display: 'block', margin: '0.5rem 0' }}
-        />
-      </label>
-      <label>
-        Politique de retrait :
-        <select
-          value={policy}
-          onChange={(e) => setPolicy(e.target.value as WithdrawalPolicy)}
-          style={{ display: 'block', margin: '0.5rem 0' }}
-        >
-          {POLICIES.map((p) => (
-            <option key={p} value={p}>
-              {POLICY_LABELS[p]}
-            </option>
-          ))}
-        </select>
-      </label>
-      {error && <p style={{ color: '#c00' }}>{error}</p>}
-      <button type="submit" disabled={loading}>
-        {loading ? 'Enregistrement…' : 'Enregistrer'}
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          setEditing(false);
-          setError(null);
-        }}
-        disabled={loading}
-        style={{ marginLeft: '0.5rem' }}
-      >
-        Annuler
-      </button>
-    </form>
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm">Modifier la cagnotte</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor={`edit-pot-title-${pot.id}`}>Titre</Label>
+            <Input
+              id={`edit-pot-title-${pot.id}`}
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor={`edit-pot-target-${pot.id}`}>Objectif (€)</Label>
+            <Input
+              id={`edit-pot-target-${pot.id}`}
+              type="number"
+              step="0.01"
+              min="0"
+              value={targetAmount}
+              onChange={(e) => setTargetAmount(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label>Politique de retrait</Label>
+            <Select
+              value={policy}
+              onValueChange={(val) => setPolicy(val as WithdrawalPolicy)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {POLICIES.map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {POLICY_LABELS[p]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          <div className="flex gap-2">
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Enregistrement…' : 'Enregistrer'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setEditing(false);
+                setError(null);
+              }}
+              disabled={loading}
+            >
+              Annuler
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -303,21 +338,28 @@ export function DeletePotButton({
   }
 
   return (
-    <div style={{ marginTop: '0.5rem' }}>
-      <button
-        type="button"
-        onClick={handleDelete}
-        disabled={loading || currentAmount > 0}
-        style={{ color: '#c00' }}
-      >
-        {loading ? 'Suppression…' : 'Supprimer'}
-      </button>
-      {currentAmount > 0 && (
-        <span style={{ marginLeft: '0.5rem', color: '#888', fontSize: '0.85rem' }}>
-          (retirez l'argent d'abord)
-        </span>
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant="destructive"
+          size="sm"
+          onClick={handleDelete}
+          disabled={loading || currentAmount > 0}
+        >
+          {loading ? 'Suppression…' : 'Supprimer'}
+        </Button>
+        {currentAmount > 0 && (
+          <span className="text-xs text-muted-foreground">
+            (retirez l&apos;argent d&apos;abord)
+          </span>
+        )}
+      </div>
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
-      {error && <p style={{ color: '#c00' }}>{error}</p>}
     </div>
   );
 }

@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { serverGraphQL, getTokenFromCookie } from '@/lib/graphql-server';
 import {
@@ -7,6 +6,9 @@ import {
   type AllowanceRule,
   type ChildAccountSummary,
 } from '@/lib/queries';
+import { BackLink } from '@/components/back-link';
+import { Card, CardContent } from '@/components/ui/card';
+import { StatusBadge } from '@/components/status-badge';
 import { CreateAllowanceForm, EditAllowanceForm, DeleteAllowanceButton } from './AllowanceActions';
 
 // Liste des virements automatiques d'un enfant (Server Component, auth parent).
@@ -56,47 +58,49 @@ export default async function AllowancesPage({
   const rules = rulesResult.data?.allowanceRules ?? [];
 
   return (
-    <main style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif' }}>
-      <p>
-        <Link href={`/parent/children/${childId}`}>← Retour</Link>
-      </p>
-      <h1>
-        Virements automatiques — {account.user.firstName} {account.user.lastName}
+    <div className="flex flex-col gap-6">
+      <BackLink href={`/parent/children/${childId}`} />
+
+      <h1 className="text-2xl font-semibold tracking-tight">
+        Virements automatiques — {account.user.firstName}{' '}
+        {account.user.lastName}
       </h1>
 
-      <h2 style={{ marginTop: '1.5rem' }}>Règles existantes</h2>
-      {rules.length === 0 ? (
-        <p style={{ color: '#888' }}>Aucun virement automatique.</p>
-      ) : (
-        <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: '1rem' }}>
-          {rules.map((rule) => (
-            <li
-              key={rule.id}
-              style={{
-                border: '1px solid #ddd',
-                borderRadius: '8px',
-                padding: '1rem',
-              }}
-            >
-              <strong>{rule.amount.toFixed(2)} €</strong>
-              {' — '}
-              {FREQUENCY_LABELS[rule.frequency] ?? rule.frequency}
-              <div style={{ marginTop: '0.25rem' }}>
-                Statut :{' '}
-                {rule.active ? (
-                  <span style={{ color: '#080' }}>Actif</span>
-                ) : (
-                  <span style={{ color: '#888' }}>Suspendu</span>
-                )}
-              </div>
-              <EditAllowanceForm rule={rule} />
-              <DeleteAllowanceButton ruleId={rule.id} />
-            </li>
-          ))}
-        </ul>
-      )}
+      <div className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">Règles existantes</h2>
+        {rules.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Aucun virement automatique.
+          </p>
+        ) : (
+          <div className="grid gap-4">
+            {rules.map((rule) => (
+              <Card key={rule.id}>
+                <CardContent className="flex flex-col gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className="font-semibold">
+                      {rule.amount.toFixed(2)} €
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      {FREQUENCY_LABELS[rule.frequency] ?? rule.frequency}
+                    </span>
+                    <StatusBadge
+                      status={rule.active ? 'ACTIVE' : 'SUSPENDED'}
+                      label={rule.active ? 'Actif' : 'Suspendu'}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <EditAllowanceForm rule={rule} />
+                    <DeleteAllowanceButton ruleId={rule.id} />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
 
       <CreateAllowanceForm params={params} />
-    </main>
+    </div>
   );
 }

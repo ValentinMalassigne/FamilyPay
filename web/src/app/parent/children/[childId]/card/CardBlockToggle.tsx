@@ -1,11 +1,15 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { use, useState } from 'react';
 import { useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client';
 import { SET_CARD_BLOCKED_MUTATION, type BlockActor } from '@/lib/queries';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { StatusBadge } from '@/components/status-badge';
+import { BackLink } from '@/components/back-link';
 
 // Bouton de blocage/déblocage de carte (Client Component).
 //
@@ -47,29 +51,40 @@ export function CardBlockToggle({
   }
 
   return (
-    <div>
-      <div style={{ margin: '1rem 0', fontSize: '1.1rem' }}>
-        État actuel :{' '}
-        {blocked ? (
-          <span style={{ color: '#c00' }}>
-            Bloquée
-            {initialBlockedBy === 'PARENT' ? ' (par un parent)' : ''}
-          </span>
-        ) : (
-          <span style={{ color: '#080' }}>Active</span>
-        )}
-      </div>
-      <button type="button" onClick={toggle} disabled={loading}>
-        {loading
-          ? '…'
-          : blocked
-            ? 'Débloquer la carte'
-            : 'Bloquer la carte'}
-      </button>
-      {error && <p style={{ color: '#c00' }}>{error}</p>}
-      <p style={{ marginTop: '1rem' }}>
-        <Link href={`/parent/children/${childId}`}>← Retour</Link>
-      </p>
+    <div className="flex flex-col gap-4">
+      <Card className="max-w-md">
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex items-center gap-2 text-lg">
+            <span className="text-muted-foreground">État actuel :</span>
+            <StatusBadge
+              status={blocked ? 'BLOCKED' : 'ACTIVE'}
+              label={
+                blocked
+                  ? `Bloquée${initialBlockedBy === 'PARENT' ? ' (par un parent)' : ''}`
+                  : 'Active'
+              }
+            />
+          </div>
+          <Button
+            type="button"
+            onClick={toggle}
+            disabled={loading}
+            variant={blocked ? 'success' : 'destructive'}
+          >
+            {loading
+              ? '…'
+              : blocked
+                ? 'Débloquer la carte'
+                : 'Bloquer la carte'}
+          </Button>
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+      <BackLink href={`/parent/children/${childId}`} />
     </div>
   );
 }

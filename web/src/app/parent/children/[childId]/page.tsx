@@ -1,7 +1,11 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { ArrowLeftRight, PiggyBank, Target, Repeat, CreditCard } from 'lucide-react';
 import { serverGraphQL, getTokenFromCookie } from '@/lib/graphql-server';
 import { CHILD_ACCOUNT_QUERY, type ChildAccountSummary } from '@/lib/queries';
+import { BackLink } from '@/components/back-link';
+import { ImagePlaceholder } from '@/components/image-placeholder';
+import { StatusBadge } from '@/components/status-badge';
 
 // Page de détail d'un enfant (Server Component, protégée par auth JWT parent).
 //
@@ -69,48 +73,61 @@ export default async function ChildDetailPage({
   }
 
   const sections = [
-    { href: 'transactions', label: 'Transactions' },
-    { href: 'pots', label: 'Cagnottes' },
-    { href: 'missions', label: 'Missions' },
-    { href: 'allowances', label: 'Virements automatiques' },
-    { href: 'card', label: 'Carte (blocage)' },
+    { href: 'transactions', label: 'Transactions', icon: ArrowLeftRight },
+    { href: 'pots', label: 'Cagnottes', icon: PiggyBank },
+    { href: 'missions', label: 'Missions', icon: Target },
+    { href: 'allowances', label: 'Virements automatiques', icon: Repeat },
+    { href: 'card', label: 'Carte (blocage)', icon: CreditCard },
   ];
 
   return (
-    <main style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif' }}>
-      <p>
-        <Link href="/parent">← Retour</Link>
-      </p>
-      <h1>
-        {account.user.firstName} {account.user.lastName}
-      </h1>
-      <p style={{ color: '#888' }}>{account.user.email}</p>
+    <div className="flex flex-col gap-6">
+      <BackLink href="/parent" />
 
-      <div style={{ margin: '1rem 0', fontSize: '1.1rem' }}>
-        Solde : <strong>{account.balance.toFixed(2)} €</strong>
-      </div>
-      <div style={{ margin: '1rem 0' }}>
-        Carte :{' '}
-        {account.blocked ? (
-          <span style={{ color: '#c00' }}>
-            Bloquée
-            {account.blockedBy === 'PARENT' ? ' (par un parent)' : ''}
-          </span>
-        ) : (
-          <span style={{ color: '#080' }}>Active</span>
-        )}
+      <div className="flex items-center gap-4">
+        {/* TODO: replace with actual avatar image */}
+        <ImagePlaceholder className="size-14 shrink-0 rounded-full" />
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {account.user.firstName} {account.user.lastName}
+          </h1>
+          <p className="text-sm text-muted-foreground">{account.user.email}</p>
+        </div>
       </div>
 
-      <h2 style={{ marginTop: '2rem' }}>Sections</h2>
-      <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: '0.5rem' }}>
-        {sections.map((s) => (
-          <li key={s.href}>
-            <Link href={`/parent/children/${childId}/${s.href}`}>
-              {s.label}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </main>
+      <div className="flex items-center gap-3 text-lg">
+        <span className="text-muted-foreground">Solde :</span>
+        <span className="font-semibold">{account.balance.toFixed(2)} €</span>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-muted-foreground">Carte :</span>
+        <StatusBadge
+          status={account.blocked ? 'BLOCKED' : 'ACTIVE'}
+          label={
+            account.blocked
+              ? `Bloquée${account.blockedBy === 'PARENT' ? ' (par un parent)' : ''}`
+              : 'Active'
+          }
+        />
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">Sections</h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {sections.map((s) => {
+            const Icon = s.icon;
+            return (
+              <Link key={s.href} href={`/parent/children/${childId}/${s.href}`}>
+                <div className="flex items-center gap-3 rounded-lg border px-4 py-3 transition-colors hover:bg-accent">
+                  <Icon className="size-5 text-muted-foreground" />
+                  <span className="font-medium">{s.label}</span>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+    </div>
   );
 }

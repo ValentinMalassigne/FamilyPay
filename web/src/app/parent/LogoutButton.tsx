@@ -1,6 +1,8 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { LogOut } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 // Bouton de déconnexion (client component car il déclenche une action navigateur).
 //
@@ -17,12 +19,9 @@ export function LogoutButton() {
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleLogout}
-      style={{ marginTop: '1rem' }}
-    >
+    <Button type="button" variant="ghost" size="sm" onClick={handleLogout}>
+      <LogOut />
       Se déconnecter
-    </button>
+    </Button>
   );
 }

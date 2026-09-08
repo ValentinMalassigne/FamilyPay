@@ -5,6 +5,11 @@ import { useState, FormEvent } from 'react';
 import { useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client';
 import { CREATE_CHILD_ACCOUNT_MUTATION } from '@/lib/queries';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 // Formulaire d'ajout d'un enfant (Client Component).
 //
@@ -69,61 +74,63 @@ export function AddChildForm() {
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      style={{
-        marginTop: '1.5rem',
-        border: '1px solid #ddd',
-        borderRadius: '8px',
-        padding: '1rem',
-      }}
-    >
-      <h3>Ajouter un enfant</h3>
-      <label>
-        Prénom :
-        <input
-          type="text"
-          value={firstName}
-          onChange={(e) => setFirstName(e.target.value)}
-          required
-          style={{ display: 'block', margin: '0.5rem 0' }}
-        />
-      </label>
-      <label>
-        Nom :
-        <input
-          type="text"
-          value={lastName}
-          onChange={(e) => setLastName(e.target.value)}
-          required
-          style={{ display: 'block', margin: '0.5rem 0' }}
-        />
-      </label>
-      <label>
-        Email :
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          style={{ display: 'block', margin: '0.5rem 0' }}
-        />
-      </label>
-      <label>
-        Mot de passe :
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          minLength={6}
-          style={{ display: 'block', margin: '0.5rem 0' }}
-        />
-      </label>
-      {error && <p style={{ color: '#c00' }}>{error}</p>}
-      <button type="submit" disabled={loading}>
-        {loading ? 'Création…' : 'Créer le compte enfant'}
-      </button>
-    </form>
+    <Card className="max-w-md">
+      <CardHeader>
+        <CardTitle className="text-base">Ajouter un enfant</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="child-firstName">Prénom</Label>
+            <Input
+              id="child-firstName"
+              type="text"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              required
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="child-lastName">Nom</Label>
+            <Input
+              id="child-lastName"
+              type="text"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              required
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="child-email">Email</Label>
+            <Input
+              id="child-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="child-password">Mot de passe</Label>
+            <Input
+              id="child-password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={6}
+            />
+          </div>
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          <Button type="submit" disabled={loading}>
+            {loading ? 'Création…' : 'Créer le compte enfant'}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }

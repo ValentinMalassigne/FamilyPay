@@ -12,6 +12,18 @@ import {
   type MissionStatus,
   type Mission,
 } from '@/lib/queries';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 // Actions sur les missions (Client Component) : création + validation/refus.
 //
@@ -53,43 +65,45 @@ export function CreateMissionForm({
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      style={{
-        marginTop: '1.5rem',
-        border: '1px solid #ddd',
-        borderRadius: '8px',
-        padding: '1rem',
-      }}
-    >
-      <h3>Créer une mission</h3>
-      <label>
-        Titre :
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          required
-          style={{ display: 'block', margin: '0.5rem 0' }}
-        />
-      </label>
-      <label>
-        Récompense (€) :
-        <input
-          type="number"
-          step="0.01"
-          min="0"
-          value={reward}
-          onChange={(e) => setReward(e.target.value)}
-          required
-          style={{ display: 'block', margin: '0.5rem 0' }}
-        />
-      </label>
-      {error && <p style={{ color: '#c00' }}>{error}</p>}
-      <button type="submit" disabled={loading}>
-        {loading ? 'Création…' : 'Créer la mission'}
-      </button>
-    </form>
+    <Card className="max-w-md">
+      <CardHeader>
+        <CardTitle className="text-base">Créer une mission</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="create-mission-title">Titre</Label>
+            <Input
+              id="create-mission-title"
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="create-mission-reward">Récompense (€)</Label>
+            <Input
+              id="create-mission-reward"
+              type="number"
+              step="0.01"
+              min="0"
+              value={reward}
+              onChange={(e) => setReward(e.target.value)}
+              required
+            />
+          </div>
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          <Button type="submit" disabled={loading}>
+            {loading ? 'Création…' : 'Créer la mission'}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -112,23 +126,32 @@ export function ValidateMissionButtons({ missionId }: { missionId: string }) {
   }
 
   return (
-    <div style={{ marginTop: '0.5rem' }}>
-      <button
-        type="button"
-        onClick={() => handle(true)}
-        disabled={loading}
-        style={{ marginRight: '0.5rem' }}
-      >
-        Valider
-      </button>
-      <button
-        type="button"
-        onClick={() => handle(false)}
-        disabled={loading}
-      >
-        Refuser
-      </button>
-      {error && <p style={{ color: '#c00' }}>{error}</p>}
+    <div className="flex flex-col gap-2">
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant="success"
+          size="sm"
+          onClick={() => handle(true)}
+          disabled={loading}
+        >
+          Valider
+        </Button>
+        <Button
+          type="button"
+          variant="destructive"
+          size="sm"
+          onClick={() => handle(false)}
+          disabled={loading}
+        >
+          Refuser
+        </Button>
+      </div>
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 }
@@ -190,77 +213,90 @@ export function EditMissionForm({ mission }: { mission: Mission }) {
 
   if (!editing) {
     return (
-      <div style={{ marginTop: '0.5rem' }}>
-        <button type="button" onClick={() => setEditing(true)}>
-          Modifier
-        </button>
-      </div>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => setEditing(true)}
+      >
+        Modifier
+      </Button>
     );
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      style={{
-        marginTop: '0.5rem',
-        border: '1px solid #ddd',
-        borderRadius: '8px',
-        padding: '1rem',
-      }}
-    >
-      <h4>Modifier la mission</h4>
-      <label>
-        Titre :
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          required
-          style={{ display: 'block', margin: '0.5rem 0' }}
-        />
-      </label>
-      <label>
-        Récompense (€) :
-        <input
-          type="number"
-          step="0.01"
-          min="0"
-          value={reward}
-          onChange={(e) => setReward(e.target.value)}
-          required
-          style={{ display: 'block', margin: '0.5rem 0' }}
-        />
-      </label>
-      <label>
-        Statut :
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value as MissionStatus)}
-          style={{ display: 'block', margin: '0.5rem 0' }}
-        >
-          {MISSION_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {MISSION_STATUS_LABELS[s]}
-            </option>
-          ))}
-        </select>
-      </label>
-      {error && <p style={{ color: '#c00' }}>{error}</p>}
-      <button type="submit" disabled={loading}>
-        {loading ? 'Enregistrement…' : 'Enregistrer'}
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          setEditing(false);
-          setError(null);
-        }}
-        disabled={loading}
-        style={{ marginLeft: '0.5rem' }}
-      >
-        Annuler
-      </button>
-    </form>
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm">Modifier la mission</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor={`edit-mission-title-${mission.id}`}>Titre</Label>
+            <Input
+              id={`edit-mission-title-${mission.id}`}
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor={`edit-mission-reward-${mission.id}`}>
+              Récompense (€)
+            </Label>
+            <Input
+              id={`edit-mission-reward-${mission.id}`}
+              type="number"
+              step="0.01"
+              min="0"
+              value={reward}
+              onChange={(e) => setReward(e.target.value)}
+              required
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label>Statut</Label>
+            <Select
+              value={status}
+              onValueChange={(val) => setStatus(val as MissionStatus)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MISSION_STATUSES.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {MISSION_STATUS_LABELS[s]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          <div className="flex gap-2">
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Enregistrement…' : 'Enregistrer'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setEditing(false);
+                setError(null);
+              }}
+              disabled={loading}
+            >
+              Annuler
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -283,16 +319,21 @@ export function DeleteMissionButton({ missionId }: { missionId: string }) {
   }
 
   return (
-    <div style={{ marginTop: '0.5rem' }}>
-      <button
+    <div className="flex flex-col gap-2">
+      <Button
         type="button"
+        variant="destructive"
+        size="sm"
         onClick={handleDelete}
         disabled={loading}
-        style={{ color: '#c00' }}
       >
         {loading ? 'Suppression…' : 'Supprimer'}
-      </button>
-      {error && <p style={{ color: '#c00' }}>{error}</p>}
+      </Button>
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation';
 import { serverGraphQL, getTokenFromCookie } from '@/lib/graphql-server';
 import { ME_QUERY, type AppUser } from '@/lib/auth-operations';
+import { ParentNav } from '@/components/parent-nav';
+import { PageContainer } from '@/components/page-container';
 
 // Layout de l'espace parent (Server Component).
 //
@@ -19,6 +21,9 @@ import { ME_QUERY, type AppUser } from '@/lib/auth-operations';
 // Ce layout ne remplace pas les checks de token des pages filles (qui restent
 // utiles pour leurs propres redirects), il ajoute le contrôle de rôle qui
 // manquait.
+//
+// Le layout rend aussi l'en-tête partagé (ParentNav) avec le profil de l'utilisateur
+// et le PageContainer pour un espacement cohérent sur toutes les sous-pages.
 export default async function ParentLayout({
   children,
 }: {
@@ -36,9 +41,19 @@ export default async function ParentLayout({
     redirect('/login');
   }
 
-  if (meResult.data.me.role !== 'PARENT') {
+  const me = meResult.data.me;
+  if (me.role !== 'PARENT') {
     redirect('/child');
   }
 
-  return <>{children}</>;
+  return (
+    <div className="min-h-screen">
+      <ParentNav
+        email={me.email}
+        firstName={me.firstName}
+        lastName={me.lastName}
+      />
+      <PageContainer>{children}</PageContainer>
+    </div>
+  );
 }
