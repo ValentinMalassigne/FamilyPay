@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ImagePlaceholder } from '@/components/image-placeholder';
+import { Logo } from '@/components/logo';
 
 // Formulaire de connexion (Client Component) extrait de login/page.tsx.
 //
@@ -64,8 +64,7 @@ export default function LoginForm() {
     <main className="flex min-h-screen items-center justify-center px-4 py-8">
       <Card className="w-full max-w-md">
         <CardHeader className="items-center text-center">
-          {/* TODO: replace with actual logo image */}
-          <ImagePlaceholder className="size-12" />
+          <Logo className="size-12" />
           <CardTitle className="text-2xl">Connexion parent</CardTitle>
           <CardDescription>
             Accède à l&apos;espace de gestion de l&apos;argent de poche

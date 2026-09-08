@@ -1,10 +1,10 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { ArrowLeftRight, PiggyBank, Target, Repeat, CreditCard } from 'lucide-react';
+import { ArrowLeftRight, PiggyBank, Target, Repeat, CreditCard, UserRound } from 'lucide-react';
 import { serverGraphQL, getTokenFromCookie } from '@/lib/graphql-server';
 import { CHILD_ACCOUNT_QUERY, type ChildAccountSummary } from '@/lib/queries';
 import { BackLink } from '@/components/back-link';
-import { ImagePlaceholder } from '@/components/image-placeholder';
+import { IconBadge } from '@/components/icon-badge';
 import { StatusBadge } from '@/components/status-badge';
 
 // Page de détail d'un enfant (Server Component, protégée par auth JWT parent).
@@ -85,8 +85,7 @@ export default async function ChildDetailPage({
       <BackLink href="/parent" />
 
       <div className="flex items-center gap-4">
-        {/* TODO: replace with actual avatar image */}
-        <ImagePlaceholder className="size-14 shrink-0 rounded-full" />
+        <IconBadge icon={UserRound} className="size-14 shrink-0 rounded-full" />
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold tracking-tight">
             {account.user.firstName} {account.user.lastName}

@@ -8,7 +8,8 @@ import {
 } from '@/lib/queries';
 import { Card, CardContent } from '@/components/ui/card';
 import { StatusBadge } from '@/components/status-badge';
-import { ImagePlaceholder } from '@/components/image-placeholder';
+import { UserRound } from 'lucide-react';
+import { IconBadge } from '@/components/icon-badge';
 import { AddChildForm } from './AddChildForm';
 
 // Espace parent (protégé par auth JWT parent).
@@ -71,8 +72,7 @@ export default async function ParentPage() {
               >
                 <Card className="transition-colors hover:bg-accent">
                   <CardContent className="flex items-center gap-4">
-                    {/* TODO: replace with actual avatar image */}
-                    <ImagePlaceholder className="size-10 shrink-0 rounded-full" />
+                    <IconBadge icon={UserRound} className="size-10 shrink-0 rounded-full" />
                     <div className="flex flex-1 flex-col gap-1">
                       <span className="font-medium">
                         {child.user.firstName} {child.user.lastName}

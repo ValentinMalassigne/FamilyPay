@@ -1,5 +1,5 @@
-import { ImagePlaceholder } from '@/components/image-placeholder';
 import { LogoutButton } from '@/app/parent/LogoutButton';
+import { Logo } from '@/components/logo';
 
 // En-tête partagé de l'espace parent (/parent/*).
 // Affiché par parent/layout.tsx : logo placeholder à gauche, profil +
@@ -18,8 +18,7 @@ export function ParentNav({
     <header className="border-b">
       <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
         <div className="flex items-center gap-2">
-          {/* TODO: replace with actual logo image */}
-          <ImagePlaceholder className="size-8" />
+          <Logo className="size-8" />
           <span className="font-semibold tracking-tight">FamilyPay</span>
         </div>
         <div className="flex items-center gap-3">

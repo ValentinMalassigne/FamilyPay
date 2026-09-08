@@ -14,7 +14,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
-import { ImagePlaceholder } from '@/components/image-placeholder';
+import { HandCoins } from 'lucide-react';
+import { IconBadge } from '@/components/icon-badge';
 
 // Page publique de don sur cagnotte (Client Component, SANS auth).
 //
@@ -99,14 +100,13 @@ export default function DonatePage({
     <main className="flex min-h-screen items-center justify-center px-4 py-8">
       <Card className="w-full max-w-md">
         <CardHeader className="items-center text-center">
-          {/* TODO: replace with actual donate illustration */}
-          <ImagePlaceholder className="size-16" />
+          <IconBadge icon={HandCoins} className="size-16" />
           <CardTitle className="text-2xl">
             {pot ? pot.title : 'Contribuer à une cagnotte'}
           </CardTitle>
-          {/* <CardDescription className="font-mono text-xs">
+          <CardDescription className="font-mono text-xs">
             {publicToken}
-          </CardDescription> */}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {potError && (
