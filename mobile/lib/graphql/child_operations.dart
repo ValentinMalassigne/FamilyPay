@@ -157,3 +157,29 @@ final kTransactionAddedSubscription = gql(r'''
     }
   }
 ''');
+
+/// Subscription `cardBlocked` : notifie en temps réel quand l'état de blocage
+/// de la carte change (bloquée ou débloquée, par un parent ou par l'enfant).
+/// Retourne le ChildAccount mis à jour.
+final kCardBlockedSubscription = gql(r'''
+  subscription CardBlocked($childId: ID!) {
+    cardBlocked(childId: $childId) {
+      id
+      blocked
+      blockedBy
+    }
+  }
+''');
+
+/// Subscription `potUpdated` : notifie en temps réel quand une cagnotte
+/// reçoit un don public (contributeToPotPublic). Retourne le Pot mis à jour.
+final kPotUpdatedSubscription = gql(r'''
+  subscription PotUpdated($childId: ID!) {
+    potUpdated(childId: $childId) {
+      id
+      title
+      currentAmount
+      targetAmount
+    }
+  }
+''');

@@ -40,6 +40,15 @@ class _HomeScreenState extends State<HomeScreen> {
   // souscription (même WS, même data, listeners différents) est sans incidence.
   StreamSubscription<QueryResult>? _balanceSub;
   StreamSubscription<QueryResult>? _txnSub;
+  StreamSubscription<QueryResult>? _cardSub;
+  StreamSubscription<QueryResult>? _potSub;
+
+  // Debounce des SnackBars : addTransaction publie balanceUpdated ET
+  // transactionAdded au même instant, ce qui déclenchait deux SnackBars. On
+  // accumule les messages dans [_pendingMessages] et attend 500ms sans nouvel
+  // événement avant d'en afficher un seul (messages joints par « · »).
+  final List<String> _pendingMessages = [];
+  Timer? _debounceTimer;
 
   @override
   void didChangeDependencies() {
@@ -47,8 +56,9 @@ class _HomeScreenState extends State<HomeScreen> {
     _subscribeNotifications();
   }
 
-  /// Souscrit à `balanceUpdated` et `transactionAdded` au niveau de HomeScreen
-  /// (toujours monté tant que l'enfant est connecté) pour notifier app-wide.
+  /// Souscrit à `balanceUpdated`, `transactionAdded`, `cardBlocked` et
+  /// `potUpdated` au niveau de HomeScreen (toujours monté tant que l'enfant
+  /// est connecté) pour notifier app-wide.
   void _subscribeNotifications() {
     if (_balanceSub != null && _txnSub != null) return;
 
@@ -66,7 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final data = result.data?['balanceUpdated'];
       if (data == null) return;
       final account = ChildAccount.fromJson(data as Map<String, dynamic>);
-      _notify('Solde mis à jour : ${account.balance.toStringAsFixed(2)} €');
+      _queueMessage('Solde : ${account.balance.toStringAsFixed(2)} €');
     });
 
     _txnSub ??= client
@@ -79,21 +89,73 @@ class _HomeScreenState extends State<HomeScreen> {
       if (data == null) return;
       final txn = Transaction.fromJson(data as Map<String, dynamic>);
       final sign = txn.isCredit ? '+' : '';
-      _notify(
+      _queueMessage(
           '${txn.label ?? txn.type} : $sign${txn.amount.toStringAsFixed(2)} €');
+    });
+
+    _cardSub ??= client
+        .subscribe(SubscriptionOptions(
+          document: kCardBlockedSubscription,
+          variables: {'childId': childId},
+        ))
+        .listen((result) {
+      final data = result.data?['cardBlocked'];
+      if (data == null) return;
+      final account = ChildAccount.fromJson(data as Map<String, dynamic>);
+      if (account.blocked) {
+        final byParent = account.blockedBy == 'PARENT' ? ' par un parent' : '';
+        _queueMessage('Carte bloquée$byParent');
+      } else {
+        _queueMessage('Carte débloquée');
+      }
+    });
+
+    _potSub ??= client
+        .subscribe(SubscriptionOptions(
+          document: kPotUpdatedSubscription,
+          variables: {'childId': childId},
+        ))
+        .listen((result) {
+      final data = result.data?['potUpdated'];
+      if (data == null) return;
+      final pot = data as Map<String, dynamic>;
+      final title = pot['title'] as String? ?? 'Cagnotte';
+      final current = (pot['currentAmount'] as num).toDouble();
+      final target = (pot['targetAmount'] as num).toDouble();
+      _queueMessage(
+          'Cagnotte « $title » : ${current.toStringAsFixed(2)} € / ${target.toStringAsFixed(2)} €');
     });
   }
 
-  /// Affiche un SnackBar in-app pour signaler une mise à jour temps réel.
-  void _notify(String text) {
+  /// Ajoute un message à la file d'attente et (re)démarre le timer de
+  /// debounce de 500ms. Quand le timer se déclenche (aucun nouvel événement
+  /// pendant 500ms), tous les messages en attente sont fusionnés en un
+  /// seul SnackBar. Cela évite d'afficher deux SnackBars quand
+  /// `addTransaction` publie `balanceUpdated` et `transactionAdded`
+  /// simultanément.
+  void _queueMessage(String message) {
+    _pendingMessages.add(message);
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 500), _flushMessages);
+  }
+
+  /// Vide la file d'attente et affiche un SnackBar unique avec tous les
+  /// messages accumulés, joints par « · ».
+  void _flushMessages() {
+    if (_pendingMessages.isEmpty) return;
+    final text = _pendingMessages.join(' · ');
+    _pendingMessages.clear();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _balanceSub?.cancel();
     _txnSub?.cancel();
+    _cardSub?.cancel();
+    _potSub?.cancel();
     super.dispose();
   }
 
