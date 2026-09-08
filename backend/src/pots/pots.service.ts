@@ -3,10 +3,12 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
+import { PubSub } from 'graphql-subscriptions';
 import { Pot, WithdrawalPolicy, PotStatus } from './entities/pot.entity.js';
 import { PotContribution } from './entities/pot-contribution.entity.js';
 import { TransactionsService } from '../transactions/transactions.service.js';
@@ -41,6 +43,10 @@ export class PotsService {
     private potContributionRepository: Repository<PotContribution>,
     private transactionsService: TransactionsService,
     private usersService: UsersService,
+    // PubSub injecté via le token 'PUB_SUB' (PubSubModule @Global). Utilisé
+    // pour publier l'événement potUpdated quand un don public arrive sur une
+    // cagnotte, afin que l'app enfant soit notifiée en temps réel.
+    @Inject('PUB_SUB') private pubSub: PubSub,
   ) {}
 
   /*
@@ -207,6 +213,18 @@ export class PotsService {
     // solde principal. On se contente d'augmenter currentAmount du pot.
     pot.currentAmount += params.amount;
     await this.potRepository.save(pot);
+
+    // Publier l'événement POT_UPDATED pour la subscription GraphQL du même nom.
+    // Une contribution publique ne crée pas de Transaction (donc pas de
+    // balanceUpdated/transactionAdded) : c'est le seul moyen pour l'app enfant
+    // de savoir qu'un don est arrivé sur sa cagnotte. Le topic inclut le childId
+    // pour le filtrage côté subscription. On ne publie QUE ici (pas dans
+    // withdrawFromPot) : le retrait déclenche déjà balanceUpdated +
+    // transactionAdded via addTransaction, donc un potUpdated supplémentaire
+    // serait redondant pour l'enfant.
+    this.pubSub.publish(`POT_UPDATED_${pot.childId}`, {
+      potUpdated: pot,
+    });
 
     // Créer l'enregistrement PotContribution.
     const contribution = this.potContributionRepository.create({

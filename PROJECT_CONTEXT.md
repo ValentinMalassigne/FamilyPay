@@ -206,6 +206,8 @@ type Mutation {
 type Subscription {
   balanceUpdated(childId: ID!): ChildAccount!
   transactionAdded(childId: ID!): Transaction!
+  cardBlocked(childId: ID!): ChildAccount!
+  potUpdated(childId: ID!): Pot!
 }
 ```
 

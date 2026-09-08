@@ -1,6 +1,7 @@
-import { Injectable, ConflictException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, ForbiddenException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { PubSub } from 'graphql-subscriptions';
 import * as bcrypt from 'bcrypt';
 import { User, Role } from './entities/user.entity.js';
 import { Family } from './entities/family.entity.js';
@@ -32,6 +33,10 @@ export class UsersService {
     private familyRepository: Repository<Family>,
     @InjectRepository(ChildAccount)
     private childAccountRepository: Repository<ChildAccount>,
+    // PubSub injecté via le token 'PUB_SUB' (fourni par PubSubModule @Global).
+    // Permet de publier l'événement cardBlocked quand l'état de blocage change,
+    // pour que l'app enfant soit notifiée en temps réel (parent ou enfant).
+    @Inject('PUB_SUB') private pubSub: PubSub,
   ) {}
 
   /*
@@ -307,7 +312,18 @@ export class UsersService {
         : BlockActor.CHILD
       : null;
 
-    return this.childAccountRepository.save(account);
+    const savedAccount = await this.childAccountRepository.save(account);
+
+    // Publier l'événement CARD_BLOCKED pour la subscription GraphQL du même nom.
+    // Le topic inclut le childId pour le filtrage côté subscription (un client ne
+    // reçoit que les événements de son propre compte). Le payload porte le
+    // ChildAccount complet (blocked, blockedBy) pour que l'app enfant puisse
+    // afficher un SnackBar différencié (bloqué par un parent vs par soi-même).
+    this.pubSub.publish(`CARD_BLOCKED_${params.childId}`, {
+      cardBlocked: savedAccount,
+    });
+
+    return savedAccount;
   }
 
   /*

@@ -1,11 +1,12 @@
-import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { Args, ID, Mutation, Query, Resolver, Subscription } from '@nestjs/graphql';
 // ID est importé pour typer explicitement les @Args d'identifiant en GraphQL.
 // reflect-metadata infère `String` pour un paramètre `string`, ce qui génère un
 // arg `String!` dans le schéma. Or PROJECT_CONTEXT.md §6 exige `ID!` pour les
 // identifiants (childId, missionId, potId...). Sans ce typage explicit, une
 // variable `$childId: ID!` côté client est rejetée par validation GraphQL
 // ("Variable of type ID! used in position expecting type String!").
-import { UseGuards, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { UseGuards, ForbiddenException, NotFoundException, Inject } from '@nestjs/common';
+import { PubSub } from 'graphql-subscriptions';
 import { UsersService } from './users.service.js';
 import { User, Role } from './entities/user.entity.js';
 import { ChildAccount } from './entities/child-account.entity.js';
@@ -29,7 +30,13 @@ import type { JwtPayload } from '../common/types.js';
  */
 @Resolver(() => User)
 export class UsersResolver {
-  constructor(private usersService: UsersService) {}
+  // PubSub injecté via le token 'PUB_SUB' (PubSubModule @Global). Utilisé par
+  // la subscription cardBlocked pour exposer un AsyncIterator sur le topic
+  // CARD_BLOCKED_{childId} publié par UsersService.setCardBlocked.
+  constructor(
+    private usersService: UsersService,
+    @Inject('PUB_SUB') private pubSub: PubSub,
+  ) {}
 
   /*
    * Query me : retourne l'utilisateur courant (authentifié via JWT).
@@ -243,5 +250,36 @@ export class UsersResolver {
       requesterRole: user.role,
       requesterFamilyId: user.familyId,
     });
+  }
+
+  /*
+   * Subscription cardBlocked : notifie en temps réel quand l'état de blocage
+   * de la carte d'un enfant change (bloquée ou débloquée).
+   *
+   * Schéma §6 : cardBlocked(childId: ID!): ChildAccount!
+   *
+   * Fonctionnement des subscriptions GraphQL (voir balanceUpdated dans
+   * transactions.resolver.ts) :
+   *   1. Le client s'abonne via une requête subscription.
+   *   2. Le resolver retourne un AsyncIterator (via pubSub.asyncIterator).
+   *   3. Quand setCardBlocked publie l'événement CARD_BLOCKED_{childId}, tous
+   *      les clients abonnés à ce childId reçoivent le ChildAccount mis à jour.
+   *
+   * Cas d'usage côté mobile : HomeScreen souscrit pour afficher un SnackBar
+   * "Carte bloquée par un parent" / "Carte débloquée", que le changement
+   * provienne du parent (depuis le dashboard web) ou de l'enfant lui-même.
+   *
+   * @Args('childId') childId : ID de l'enfant dont on suit l'état de blocage.
+   *
+   * Filtre : le client ne reçoit que les événements pour le childId spécifié.
+   * On compare payload.cardBlocked.userId (le ChildAccount porte userId, qui
+   * vaut l'ID du User enfant = childId) à la variable childId de la subscription.
+   */
+  @Subscription(() => ChildAccount, {
+    filter: (payload, variables) =>
+      payload.cardBlocked.userId === variables.childId,
+  })
+  cardBlocked(@Args('childId', { type: () => ID }) childId: string) {
+    return this.pubSub.asyncIterator(`CARD_BLOCKED_${childId}`);
   }
 }

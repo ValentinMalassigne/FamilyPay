@@ -1,7 +1,8 @@
-import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { Args, ID, Mutation, Query, Resolver, Subscription } from '@nestjs/graphql';
 // ID : voir users.resolver.ts — typage explicite requis pour les args d'identifiant
 // (childId, potId ici) afin de générer `ID!` et non `String!` dans le schéma GraphQL.
-import { UseGuards } from '@nestjs/common';
+import { UseGuards, Inject } from '@nestjs/common';
+import { PubSub } from 'graphql-subscriptions';
 import { PotsService } from './pots.service.js';
 import { Pot, WithdrawalPolicy } from './entities/pot.entity.js';
 import { PotContribution } from './entities/pot-contribution.entity.js';
@@ -31,7 +32,13 @@ import type { JwtPayload } from '../common/types.js';
  */
 @Resolver(() => Pot)
 export class PotsResolver {
-  constructor(private potsService: PotsService) {}
+  // PubSub injecté via le token 'PUB_SUB' (PubSubModule @Global). Utilisé par
+  // la subscription potUpdated pour exposer un AsyncIterator sur le topic
+  // POT_UPDATED_{childId} publié par PotsService.contributeToPotPublic.
+  constructor(
+    private potsService: PotsService,
+    @Inject('PUB_SUB') private pubSub: PubSub,
+  ) {}
 
   /*
    * Query pots : retourne les cagnottes d'un enfant visibles par l'appelant.
@@ -211,5 +218,44 @@ export class PotsResolver {
     @Args('potId', { type: () => ID }) potId: string,
   ): Promise<boolean> {
     return this.potsService.deletePot({ potId, requester: user });
+  }
+
+  /*
+   * Subscription potUpdated : notifie en temps réel quand une cagnotte de
+   * l'enfant est mise à jour par un don public (contributeToPotPublic).
+   *
+   * Schéma §6 : potUpdated(childId: ID!): Pot!
+   *
+   * Pourquoi cette subscription existe :
+   *   Une contribution publique (page de don Next.js sans auth) augmente
+   *   pot.currentAmount mais ne crée PAS de Transaction sur le solde principal.
+   *   Les subscriptions balanceUpdated / transactionAdded ne se déclenchent donc
+   *   pas. potUpdated est le seul canal par lequel l'app enfant apprend qu'un
+   *   don est arrivé sur sa cagnotte.
+   *
+   * Fonctionnement des subscriptions GraphQL (voir balanceUpdated dans
+   * transactions.resolver.ts) :
+   *   1. Le client s'abonne via une requête subscription.
+   *   2. Le resolver retourne un AsyncIterator (via pubSub.asyncIterator).
+   *   3. Quand contributeToPotPublic publie POT_UPDATED_{childId}, tous les
+   *      clients abonnés à ce childId reçoivent le Pot mis à jour.
+   *
+   * Note : on ne publie PAS potUpdated lors d'un retrait (withdrawFromPot).
+   * Le retrait déclenche déjà balanceUpdated + transactionAdded via
+   * addTransaction, ce qui suffit à notifier l'enfant. Un potUpdated
+   * supplémentaire générerait un SnackBar redondant.
+   *
+   * @Args('childId') childId : ID de l'enfant propriétaire de la cagnotte.
+   *
+   * Filtre : le client ne reçoit que les événements pour le childId spécifié.
+   * On compare payload.potUpdated.childId (le Pot porte childId = l'ID du User
+   * enfant) à la variable childId de la subscription.
+   */
+  @Subscription(() => Pot, {
+    filter: (payload, variables) =>
+      payload.potUpdated.childId === variables.childId,
+  })
+  potUpdated(@Args('childId', { type: () => ID }) childId: string) {
+    return this.pubSub.asyncIterator(`POT_UPDATED_${childId}`);
   }
 }
