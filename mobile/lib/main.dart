@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 
 import 'config/graphql_client.dart';
 import 'services/auth_service.dart';
-import 'services/notification_service.dart';
 import 'utils/token_store.dart';
 
 /// Point d'entrée de l'app mobile FamilyPay (côté enfant).
@@ -19,11 +18,6 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await dotenv.load(fileName: '.env');
-
-  // Initialisation des notifications locales (OS-level) avant runApp :
-  // le plugin doit être prêt avant qu'une subscription WebSocket ne
-  // déclenche une notification.
-  await NotificationService.instance.init();
 
   // TokenStore partagé : détient le JWT de l'enfant connecté.
   // Le client GraphQL le lit via `tokenProvider` à chaque requête.

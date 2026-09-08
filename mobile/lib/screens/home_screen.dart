@@ -8,7 +8,6 @@ import '../graphql/child_operations.dart';
 import '../models/child_account.dart';
 import '../models/transaction.dart';
 import '../services/auth_service.dart';
-import '../services/notification_service.dart';
 import '../utils/token_store.dart';
 import 'tabs/balance_tab.dart';
 import 'tabs/missions_tab.dart';
@@ -35,11 +34,10 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
-  // Subscriptions app-level : servent uniquement à afficher un SnackBar +
-  // une notification OS quand une mise à jour temps réel arrive, quel que
-  // soit l'onglet actif. Les onglets gardent leurs propres subscriptions
-  // pour rafraîchir leur UI ; la double souscription (même WS, même data,
-  // listeners différents) est sans incidence.
+  // Subscriptions app-level : servent uniquement à afficher un SnackBar quand
+  // une mise à jour temps réel arrive, quel que soit l'onglet actif. Les onglets
+  // gardent leurs propres subscriptions pour rafraîchir leur UI ; la double
+  // souscription (même WS, même data, listeners différents) est sans incidence.
   StreamSubscription<QueryResult>? _balanceSub;
   StreamSubscription<QueryResult>? _txnSub;
 
@@ -68,8 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final data = result.data?['balanceUpdated'];
       if (data == null) return;
       final account = ChildAccount.fromJson(data as Map<String, dynamic>);
-      final msg = 'Solde mis à jour : ${account.balance.toStringAsFixed(2)} €';
-      _notify(msg, 'Solde : ${account.balance.toStringAsFixed(2)} €');
+      _notify('Solde mis à jour : ${account.balance.toStringAsFixed(2)} €');
     });
 
     _txnSub ??= client
@@ -82,19 +79,15 @@ class _HomeScreenState extends State<HomeScreen> {
       if (data == null) return;
       final txn = Transaction.fromJson(data as Map<String, dynamic>);
       final sign = txn.isCredit ? '+' : '';
-      final msg =
-          '${txn.label ?? txn.type} : $sign${txn.amount.toStringAsFixed(2)} €';
       _notify(
-          msg, '${txn.label ?? txn.type} $sign${txn.amount.toStringAsFixed(2)} €');
+          '${txn.label ?? txn.type} : $sign${txn.amount.toStringAsFixed(2)} €');
     });
   }
 
-  /// Affiche à la fois un SnackBar in-app et une notification OS-level.
-  void _notify(String snackBarText, String notifBody) {
+  /// Affiche un SnackBar in-app pour signaler une mise à jour temps réel.
+  void _notify(String text) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(snackBarText)));
-    NotificationService.instance.show('FamilyPay', notifBody);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
   @override
