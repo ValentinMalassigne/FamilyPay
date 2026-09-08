@@ -1,10 +1,11 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, ForbiddenException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { PubSub } from 'graphql-subscriptions';
 import * as bcrypt from 'bcrypt';
 import { User, Role } from './entities/user.entity.js';
 import { Family } from './entities/family.entity.js';
-import { ChildAccount } from './entities/child-account.entity.js';
+import { ChildAccount, BlockActor } from './entities/child-account.entity.js';
 
 /*
  * UsersService : service contenant la logique métier autour des utilisateurs.
@@ -32,6 +33,10 @@ export class UsersService {
     private familyRepository: Repository<Family>,
     @InjectRepository(ChildAccount)
     private childAccountRepository: Repository<ChildAccount>,
+    // PubSub injecté via le token 'PUB_SUB' (fourni par PubSubModule @Global).
+    // Permet de publier l'événement cardBlocked quand l'état de blocage change,
+    // pour que l'app enfant soit notifiée en temps réel (parent ou enfant).
+    @Inject('PUB_SUB') private pubSub: PubSub,
   ) {}
 
   /*
@@ -51,6 +56,53 @@ export class UsersService {
   }
 
   /*
+   * findChildAccountByUserId : recherche le ChildAccount d'un enfant par son
+   * userId (l'ID du User role=CHILD). Retourne null si non trouvé.
+   *
+   * Utilisé par la query childAccount(childId) : childId est l'ID du User enfant,
+   * et ChildAccount.userId pointe vers ce User (relation OneToOne).
+   *
+   * relations: { user: true } : on charge EAGER la relation user ici (au lieu de
+   * s'appuyer sur le lazy loading TypeORM). Le champ GraphQL `user` est déclaré
+   * non-nullable (@Field(() => User) sur l'entité) et consommé par le web
+   * (childAccount { user { id firstName lastName email } }). Sans ce eager,
+   * NestJS doit résoudre la Promise lazy à la volée, ce qui est fragile et
+   * asymétrique avec findChildrenByFamilyId (qui charge déjà user en eager).
+   * On aligne les deux méthodes pour éviter qu'un enfant apparaisse dans
+   * myChildren mais refuse de se charger via childAccount.
+   */
+  async findChildAccountByUserId(userId: string): Promise<ChildAccount | null> {
+    return this.childAccountRepository.findOne({
+      where: { userId },
+      relations: { user: true },
+    });
+  }
+
+  /*
+   * findChildrenByFamilyId : retourne tous les ChildAccount des enfants
+   * appartenant à une famille donnée, avec leur User chargé.
+   *
+   * Utilisé par la query myChildren : un parent demande la liste de ses
+   * enfants (solde, état de blocage) pour afficher son dashboard.
+   *
+   * Requête TypeORM : on filtre sur child_account via la relation user.
+   * - where: { user: { familyId, role: Role.CHILD } } : TypeORM génère une
+   *   jointure implicite vers la table "user" et filtre sur les User dont
+   *   familyId correspond ET role = CHILD. Cela garantit qu'on ne récupère
+   *   que les comptes des enfants (et pas un éventuel second parent de la
+   *   famille, qui n'a pas de ChildAccount de toute façon).
+   * - relations: { user: true } : charge eagerly le User associé à chaque
+   *   ChildAccount pour éviter un second round-trip DB quand le client
+   *   GraphQL demande `user { firstName lastName email }`.
+   */
+  async findChildrenByFamilyId(familyId: string): Promise<ChildAccount[]> {
+    return this.childAccountRepository.find({
+      where: { user: { familyId, role: Role.CHILD } },
+      relations: { user: true },
+    });
+  }
+
+  /*
    * signup : crée la première Family + le premier User (role=PARENT).
    *
    * Flux (PROJECT_CONTEXT.md §4) : pas d'invitation par code. Le premier
@@ -64,6 +116,10 @@ export class UsersService {
    *  3. Créer la Family.
    *  4. Créer le User (role=PARENT, familyId=family.id, createdByUserId=null).
    *
+   * Retourne le User créé (sans token). La signature du JWT est la
+   * responsabilité d'AuthService, pas de UsersService (séparation des
+   * responsabilités : UsersService gère la DB, AuthService gère le JWT).
+   *
    * bcrypt.hash(password, 10) : 10 = nombre de rounds (cost factor). Plus c'est
    * élevé, plus c'est lent (donc résistant au brute-force) mais coûteux CPU.
    * 10 est la valeur standard.
@@ -74,7 +130,7 @@ export class UsersService {
     email: string;
     password: string;
     familyName: string;
-  }): Promise<{ user: User; token: string }> {
+  }): Promise<User> {
     const existing = await this.findByEmail(params.email);
     if (existing) {
       throw new ConflictException('Un compte existe déjà avec cet email');
@@ -95,9 +151,7 @@ export class UsersService {
       familyId: savedFamily.id,
       createdByUserId: null,
     });
-    const savedUser = await this.userRepository.save(user);
-
-    return { user: savedUser, token: '' };
+    return this.userRepository.save(user);
   }
 
   /*
@@ -181,6 +235,95 @@ export class UsersService {
       createdByUserId: params.creatorId,
     });
     return this.userRepository.save(user);
+  }
+
+  /*
+   * setCardBlocked : bloque ou débloque la carte d'un enfant.
+   *
+   * Règle métier — blocage de carte (PROJECT_CONTEXT.md §4) :
+   *  - blockedBy détermine la priorité.
+   *  - Si blockedBy = PARENT : seul un parent peut débloquer. L'enfant ne
+   *    peut rien faire (ni bloquer ni débloquer).
+   *  - Si blockedBy = CHILD ou null : l'enfant peut bloquer/débloquer lui-même.
+   *  - Un parent peut TOUJOURS bloquer/débloquer, quel que soit l'état actuel.
+   *
+   * Logique :
+   *  - Parent appelant :
+   *    - blocked=true  → blocked=true, blockedBy=PARENT.
+   *    - blocked=false → blocked=false, blockedBy=null.
+   *  - Enfant appelant (uniquement sur son propre compte) :
+   *    - Si blockedBy=PARENT → ForbiddenException (seul un parent peut débloquer).
+   *    - blocked=true  → blocked=true, blockedBy=CHILD.
+   *    - blocked=false → blocked=false, blockedBy=null.
+   *
+   * @throws NotFoundException si l'enfant ou son ChildAccount n'existe pas.
+   * @throws ForbiddenException si l'enfant n'est pas dans la famille du parent,
+   *         si l'enfant tente de modifier un compte qui n'est pas le sien,
+   *         ou si l'enfant tente de modifier une carte bloquée par un parent.
+   */
+  async setCardBlocked(params: {
+    childId: string;
+    blocked: boolean;
+    requesterId: string;
+    requesterRole: Role;
+    requesterFamilyId: string;
+  }): Promise<ChildAccount> {
+    const child = await this.findById(params.childId);
+    if (!child) {
+      throw new NotFoundException('Enfant non trouvé');
+    }
+
+    // Un parent peut agir sur les enfants de SA famille.
+    // Un enfant ne peut agir que sur son PROPRE compte.
+    if (params.requesterRole === Role.PARENT) {
+      if (child.familyId !== params.requesterFamilyId) {
+        throw new ForbiddenException(
+          "Vous n'avez pas accès au compte de cet enfant",
+        );
+      }
+    } else {
+      if (params.requesterId !== params.childId) {
+        throw new ForbiddenException(
+          'Un enfant ne peut bloquer que sa propre carte',
+        );
+      }
+    }
+
+    const account = await this.findChildAccountByUserId(params.childId);
+    if (!account) {
+      throw new NotFoundException('Compte enfant non trouvé');
+    }
+
+    // Si l'appelant est un enfant et que la carte est bloquée par un parent,
+    // il ne peut rien faire (ni bloquer ni débloquer).
+    if (
+      params.requesterRole === Role.CHILD &&
+      account.blockedBy === BlockActor.PARENT
+    ) {
+      throw new ForbiddenException(
+        'Cette carte a été bloquée par un parent — seul un parent peut la débloquer',
+      );
+    }
+
+    account.blocked = params.blocked;
+    account.blockedBy = params.blocked
+      ? params.requesterRole === Role.PARENT
+        ? BlockActor.PARENT
+        : BlockActor.CHILD
+      : null;
+
+    const savedAccount = await this.childAccountRepository.save(account);
+
+    // Publier l'événement CARD_BLOCKED pour la subscription GraphQL du même nom.
+    // Le topic inclut le childId pour le filtrage côté subscription (un client ne
+    // reçoit que les événements de son propre compte). Le payload porte le
+    // ChildAccount complet (blocked, blockedBy) pour que l'app enfant puisse
+    // afficher un SnackBar différencié (bloqué par un parent vs par soi-même).
+    this.pubSub.publish(`CARD_BLOCKED_${params.childId}`, {
+      cardBlocked: savedAccount,
+    });
+
+    return savedAccount;
   }
 
   /*

@@ -26,11 +26,16 @@ le sous-dossier — respecte-les.
 
 ## Workflow Git (voir PROJECT_CONTEXT.md §11)
 
-- `main` est toujours stable/démontrable. **Jamais de commit direct sur `main`.**
+- `main` : branche de releases stables. **Jamais de commit direct sur `main`.**
+  Elle est mise à jour uniquement par PR depuis `development` au moment d'une
+  démo ou d'une release.
+- `development` : branche d'intégration. C'est la cible de toutes les PR de
+  feature. Les branches de feature partent de `development` et y sont mergées
+  via Pull Request (même en solo — historique de revue propre, bonne pratique
+  en entretien).
 - Une branche par feature, préfixée : `feat/...`, `fix/...`, `chore/...`,
   `docs/...` (ex. `feat/backend-mission-flow`).
-- Chaque branche est mergée dans `main` via une Pull Request (même en solo —
-  historique de revue propre, bonne pratique en entretien).
+  Pour en créer une : `git checkout development && git pull && git checkout -b feat/...`.
 - Commits atomiques en Conventional Commits :
   `type(scope): description au présent, minuscule, sans point final`
   - Types : `feat`, `fix`, `refactor`, `docs`, `chore`, `test`, `style`

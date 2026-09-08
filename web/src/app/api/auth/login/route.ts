@@ -1,0 +1,58 @@
+import { NextResponse } from 'next/server';
+import { serverGraphQL, AUTH_COOKIE } from '@/lib/graphql-server';
+import { LOGIN_MUTATION } from '@/lib/auth-operations';
+
+// Route Handler de login (POST /api/auth/login).
+//
+// Reçoit { email, password } en JSON, appelle la mutation `login` du backend
+// côté serveur Next.js, puis pose le JWT retourné dans un cookie httpOnly.
+//
+// Le token n'est JAMAIS renvoyé au navigateur dans le corps de la réponse :
+// seule une confirmation { user } est renvoyée. Le navigateur ne peut pas
+// lire le cookie httpOnly (protection XSS). Les requêtes GraphQL ultérieures
+// passent par le proxy /api/graphql qui lit ce cookie et injecte l'Authorization.
+export async function POST(request: Request) {
+  let body: { email?: string; password?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'JSON invalide' }, { status: 400 });
+  }
+
+  const { email, password } = body;
+  if (!email || !password) {
+    return NextResponse.json(
+      { error: 'Email et mot de passe requis' },
+      { status: 400 },
+    );
+  }
+
+  // On récupère le role depuis la réponse du backend pour orienter la
+  // redirection côté client (un enfant ne va pas sur /parent mais sur /child).
+  type LoginData = { login: { token: string; user: { role: 'PARENT' | 'CHILD' } } };
+  const result = await serverGraphQL<LoginData>(LOGIN_MUTATION, { email, password });
+
+  if (result.errors || !result.data?.login?.token) {
+    const message = result.errors?.[0]?.message ?? 'Identifiants invalides';
+    return NextResponse.json({ error: message }, { status: 401 });
+  }
+
+  const token = result.data.login.token;
+  const role = result.data.login.user.role;
+
+  // Pose le cookie httpOnly. SameSite=Lax protège contre CSRF pour les
+  // requêtes cross-site simples.
+  const response = NextResponse.json({ ok: true, role });
+  response.cookies.set(AUTH_COOKIE, token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 60 * 60 * 24 * 7, // 7 jours, aligné sur l'expiration du JWT backend.
+    // secure dépend du transport (HTTP vs HTTPS), pas du build mode.
+    // COOKIE_SECURE=true uniquement quand TLS est actif (ex. derrière un ALB
+    // ou Nginx avec certbot). Non défini → false (HTTP plain, EC2 actuelle).
+    secure: process.env.COOKIE_SECURE === 'true',
+  });
+
+  return response;
+}

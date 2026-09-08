@@ -1,4 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
+import { Public } from '../common/public.decorator.js';
 
 /*
  * HealthController : endpoint de health-check exposé sur GET /health.
@@ -10,6 +11,10 @@ import { Controller, Get } from '@nestjs/common';
  * Kubernetes, ECS...) appelle /health pour savoir si le service est prêt à recevoir du
  * trafic. Réponse 200 = OK.
  *
+ * @Public() : GqlAuthGuard est global (APP_GUARD) et s'applique à TOUS les handlers,
+ * y compris les contrôleurs REST. Sans @Public(), /health exigerait un JWT et le
+ * load balancer n'obtiendrait que des 401. On marque donc cette route comme publique.
+ *
  * Ce contrôleur est volontairement hors du module GraphQL : c'est un simple endpoint REST,
  * pas une query GraphQL.
  */
@@ -20,6 +25,7 @@ export class HealthController {
    * Sans argument, il correspond au chemin du contrôleur (/health).
    * Retourne un objet simple { status: 'ok' } → NestJS le sérialise en JSON.
    */
+  @Public()
   @Get()
   check() {
     return { status: 'ok' };

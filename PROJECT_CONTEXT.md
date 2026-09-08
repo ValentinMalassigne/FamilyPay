@@ -42,6 +42,8 @@ Aucune vraie carte bancaire ni vrai paiement : toutes les transactions (dépense
 
 **Règle métier — blocage de carte** : le champ `blockedBy` détermine qui a la priorité. Si `blockedBy = PARENT`, seul un parent peut débloquer. Si `blockedBy = CHILD` (ou null), l'enfant peut lui-même bloquer/débloquer. Un parent peut toujours bloquer/débloquer quel que soit l'état actuel.
 
+**Règle métier — solde non négatif** : le solde d'un enfant ne peut **jamais** passer en négatif. On simule une carte bancaire pour ados, pas un découvert autorisé. Tout débit (EXPENSE...) qui ferait passer `balance` sous 0 est rejeté côté backend (`BadRequestException`). Les crédits (RECHARGE, ALLOWANCE, MISSION_REWARD, QUIZ_REWARD, POT_WITHDRAWAL) sont toujours autorisés. `POT_CONTRIBUTION` n'affecte plus le solde principal (la cagnotte est un solde séparé).
+
 ### Transaction
 - id, childId, amount (positif = crédit, négatif = débit), type (`RECHARGE` | `ALLOWANCE` | `EXPENSE` | `MISSION_REWARD` | `QUIZ_REWARD` | `POT_CONTRIBUTION` | `POT_WITHDRAWAL`), label, category (optionnel, ex. "Fast-food", "Loisirs"), createdAt, createdBy (`SYSTEM` | `CHILD` | `PARENT`)
 - `RECHARGE` : recharge manuelle ponctuelle par un parent (paiement CB simulé, pas de vrai encaissement)
@@ -53,14 +55,14 @@ Aucune vraie carte bancaire ni vrai paiement : toutes les transactions (dépense
 - Défini par un parent. Exécuté par un cron NestJS (`@nestjs/schedule`) qui crée une `Transaction` de type `ALLOWANCE` et met à jour le solde. Indépendant des recharges manuelles ponctuelles (`RECHARGE`).
 
 ### Pot (cagnotte)
-- id, childId, title, targetAmount, currentAmount, publicToken (UUID, pour le lien de don public), hiddenFrom (liste d'userId de parents à qui la cagnotte est masquée — vide par défaut = visible par toute la famille), withdrawalPolicy (`ANYTIME` | `WHEN_FULL` | `PARENT_ONLY`, défini par le parent à la création de la cagnotte)
+- id, childId, title, targetAmount, currentAmount, publicToken (UUID, pour le lien de don public), hiddenFrom (liste d'userId de parents à qui la cagnotte est masquée — vide par défaut = visible par toute la famille), withdrawalPolicy (`ANYTIME` | `WHEN_FULL` | `PARENT_ONLY`, défini par le parent à la création de la cagnotte), status (`OPEN` | `CLOSED`, défaut `OPEN`)
 - Une cagnotte est toujours visible par l'enfant propriétaire. `hiddenFrom` permet de masquer une cagnotte à un parent spécifique (ex. cagnotte "cadeau papa" avec `hiddenFrom = [id du père]`).
 
-**Règle métier — retrait de cagnotte** : `withdrawalPolicy` détermine si l'enfant peut retirer librement (`ANYTIME`), uniquement une fois l'objectif atteint (`WHEN_FULL`), ou jamais lui-même (`PARENT_ONLY`, seul un parent peut transférer l'argent vers le solde principal). **Dans tous les cas, un parent peut effectuer le retrait lui-même**, quelle que soit la policy — le guard sur la mutation de retrait doit distinguer l'appelant (enfant → vérifier la policy ; parent → toujours autorisé).
+**Règle métier — retrait de cagnotte** : `withdrawalPolicy` détermine si l'enfant peut retirer librement (`ANYTIME`), uniquement une fois l'objectif atteint (`WHEN_FULL`), ou jamais lui-même (`PARENT_ONLY`, seul un parent peut transférer l'argent vers le solde principal). **Dans tous les cas, un parent peut effectuer le retrait lui-même**, quelle que soit la policy — le guard sur la mutation de retrait doit distinguer l'appelant (enfant → vérifier la policy ; parent → toujours autorisé). **Tout retrait clôture la cagnotte (status → CLOSED), plus aucune contribution n'est acceptée (enfant, parent, ou don public). Le retrait transfère l'intégralité du `currentAmount` vers le solde principal de l'enfant** — une cagnotte se vide en une fois, puis se clôture.
 
 ### PotContribution
 - id, potId, amount, contributorName (texte libre, optionnel — pour les dons publics anonymes ou signés), createdAt, isPublicDonation (bool)
-- Une contribution publique (via le lien, sans auth) crée une `PotContribution` + une `Transaction` de type `POT_CONTRIBUTION` sur le compte de l'enfant.
+- Une contribution publique (via le lien, sans auth) crée une `PotContribution` et met à jour `pot.currentAmount`. Aucune transaction sur le solde principal — la cagnotte est un solde séparé. L'argent n'est transféré vers le solde principal qu'au moment du retrait (voir `Pot` ci-dessus).
 - **Montant plafonné** : le montant d'une contribution (publique ou non) ne peut pas dépasser la place restante dans la cagnotte (`targetAmount - currentAmount`), pour éviter tout dépassement de l'objectif. À valider côté resolver avant insertion.
 
 ### Mission
@@ -130,11 +132,13 @@ type ChildAccount {
 
 type Transaction {
   id: ID!
+  childId: ID!
   amount: Float!
   type: TransactionType!
   label: String
   category: String
   createdAt: DateTime!
+  createdBy: CreatedBy!
 }
 
 type Pot {
@@ -145,6 +149,17 @@ type Pot {
   publicToken: String!
   hiddenFrom: [ID!]!
   withdrawalPolicy: WithdrawalPolicy!
+  status: PotStatus!
+}
+
+# Type de projection en lecture seule exposé par la query publique
+# potByPublicToken. Ne contient que les champs sûrs visibles par un donateur
+# externe sans JWT (pas de childId, hiddenFrom, publicToken ni d'ID interne).
+type PublicPot {
+  title: String!
+  targetAmount: Float!
+  currentAmount: Float!
+  status: PotStatus!
 }
 
 type Mission {
@@ -164,9 +179,11 @@ type AIInsight {
 # Queries
 type Query {
   me: User!
+  myChildAccount: ChildAccount!
   childAccount(childId: ID!): ChildAccount!
   transactions(childId: ID!): [Transaction!]!
   pots(childId: ID!): [Pot!]!
+  potByPublicToken(publicToken: String!): PublicPot!
   missions(childId: ID!): [Mission!]!
   aiInsights(childId: ID!): [AIInsight!]!
 }
@@ -188,16 +205,26 @@ type Mutation {
   answerQuiz(quizId: ID!, answerIndex: Int!): QuizAttempt!
   setRecommendation(childId: ID!, domain: Domain!, description: String!): Recommendation!
   generateAICoachInsight(childId: ID!): AIInsight!
+  updatePot(potId: ID!, title: String, targetAmount: Float, withdrawalPolicy: WithdrawalPolicy): Pot!
+  deletePot(potId: ID!): Boolean!
+  updateMission(missionId: ID!, title: String, reward: Float, status: MissionStatus): Mission!
+  deleteMission(missionId: ID!): Boolean!
+  updateAllowanceRule(ruleId: ID!, amount: Float, frequency: AllowanceFrequency, active: Boolean): AllowanceRule!
+  deleteAllowanceRule(ruleId: ID!): Boolean!
 }
 
 # Subscriptions
 type Subscription {
   balanceUpdated(childId: ID!): ChildAccount!
   transactionAdded(childId: ID!): Transaction!
+  cardBlocked(childId: ID!): ChildAccount!
+  potUpdated(childId: ID!): Pot!
 }
 ```
 
 **Note sur `contributeToPotPublic`** : c'est la seule mutation accessible sans JWT (page publique Next.js). Elle doit être exclue du guard d'authentification global, avec sa propre validation (token de cagnotte valide, montant positif, éventuel throttling anti-abus).
+
+**Note sur `potByPublicToken`** : query publique (sans JWT) en lecture seule, elle aussi exclue du guard d'authentification global. Elle renvoie un `PublicPot` réduit (title, targetAmount, currentAmount, status) — jamais le type `Pot` complet, pour ne pas divulger `childId`, `hiddenFrom` ou l'ID interne à un donateur externe.
 
 ## 7. Fonctionnalité IA — Coach budget (Mistral)
 
@@ -243,9 +270,9 @@ Contrainte importante : je suis débutant sur NestJS, GraphQL et PostgreSQL. Tou
 ## 11. Workflow Git
 
 **Branches**
-- `main` : toujours stable/démontrable, jamais de commit direct dessus
-- Une branche par fonctionnalité, préfixée par type : `feat/...`, `fix/...`, `chore/...`, `docs/...` (ex. `feat/backend-mission-flow`, `feat/mobile-biometric-unlock`)
-- Chaque branche est mergée dans `main` via une Pull Request (même en solo — ça garde un historique de revue propre et montre une pratique d'équipe en entretien), une fois la fonctionnalité fonctionnelle
+- `main` : branche de releases stables, jamais de commit direct dessus. Elle est mise à jour uniquement par PR depuis `development` au moment d'une démo ou d'une release.
+- `development` : branche d'intégration, cible de toutes les PR de feature.
+- Une branche par fonctionnalité, préfixée par type : `feat/...`, `fix/...`, `chore/...`, `docs/...` (ex. `feat/backend-mission-flow`, `feat/mobile-biometric-unlock`). Les branches de feature partent de `development` et y sont mergées via une Pull Request (même en solo — ça garde un historique de revue propre et montre une pratique d'équipe en entretien), une fois la fonctionnalité fonctionnelle. Pour en créer une : `git checkout development && git pull && git checkout -b feat/...`
 
 **Commits — Conventional Commits, atomiques**
 - Format : `type(scope): description au présent, en minuscule, sans point final`

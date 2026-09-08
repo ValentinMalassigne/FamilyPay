@@ -30,4 +30,15 @@ class AppUser {
       lastName: json['lastName'] as String,
     );
   }
+
+  /// Sérialise l'utilisateur en JSON pour persistance dans le secure storage.
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'email': email,
+      'role': role,
+      'firstName': firstName,
+      'lastName': lastName,
+    };
+  }
 }

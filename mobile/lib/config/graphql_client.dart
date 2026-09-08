@@ -37,7 +37,30 @@ ValueNotifier<GraphQLClient> initGraphqlClient({
   // L'URL WebSocket se déduit de l'URL HTTP : http(s):// -> ws(s)://.
   final wsUrl = graphqlUrl.replaceFirst('http', 'ws');
 
-  final wsLink = WebSocketLink(wsUrl);
+  // WebSocketLink pour les subscriptions GraphQL.
+  //
+  // subProtocol : le backend NestJS configure `subscriptions: { 'graphql-ws': true }`
+  // qui utilise le package npm `graphql-ws`. Ce package implémente le protocole
+  // `graphql-transport-ws` (le standard moderne), PAS l'ancien protocole
+  // `graphql-ws` (déprécié). Sans ce subProtocol explicite, le client utilise
+  // `graphql-ws` par défaut, le serveur refuse la connexion (inadéquation de
+  // protocole) et le client boucle en reconnexion infinie.
+  //
+  // initialPayload : le JWT est passé via `connectionParams` du protocole
+  // `graphql-transport-ws`. Le `connection_init` envoyé à la connexion
+  // contient ce payload, que le backend lit dans le contexte GraphQL pour
+  // authentifier la subscription (le GqlAuthGuard lit `connectionParams`
+  // quand `ctx.req` n'est pas une requête HTTP Express).
+  final wsLink = WebSocketLink(
+    wsUrl,
+    config: SocketClientConfig(
+      initialPayload: () async {
+        final token = await tokenProvider();
+        return token == null ? {} : {'authorization': 'Bearer $token'};
+      },
+    ),
+    subProtocol: GraphQLProtocol.graphqlTransportWs,
+  );
 
   final link = Link.split(
     // Route les subscriptions vers le WebSocket, le reste vers HTTP.
@@ -73,6 +96,7 @@ class FamilyPayApp extends StatelessWidget {
       client: client,
       child: MaterialApp(
         title: 'FamilyPay',
+        debugShowCheckedModeBanner: false,
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
           useMaterial3: true,

@@ -1,5 +1,8 @@
 import { type ReactNode } from 'react';
+import { GeistSans } from 'geist/font/sans';
+import { GeistMono } from 'geist/font/mono';
 import { ApolloProviderWrapper } from '@/components/ApolloProviderWrapper';
+import './globals.css';
 
 // Layout racine de l'app Next.js (App Router).
 //
@@ -9,12 +12,17 @@ import { ApolloProviderWrapper } from '@/components/ApolloProviderWrapper';
 export const metadata = {
   title: 'FamilyPay',
   description: "Espace parent FamilyPay — gestion de l'argent de poche",
+  // Favicon (onglet navigateur) et Apple touch icon : un seul fichier
+  // logo.png servi depuis /public, réutilisé par le composant <Logo>.
+  icons: { icon: '/logo.png', apple: '/logo.png' },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="fr">
-      <body>
+      <body
+        className={`${GeistSans.variable} ${GeistMono.variable} font-sans antialiased`}
+      >
         <ApolloProviderWrapper>{children}</ApolloProviderWrapper>
       </body>
     </html>

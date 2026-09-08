@@ -1,0 +1,481 @@
+// Documents GraphQL partagés pour l'espace parent.
+//
+// Centralisés ici pour éviter la duplication entre les Server Components
+// (via serverGraphQL) et les Client Components (via Apollo Client). Les types
+// TypeScript associés sont déclarés à côté de chaque document.
+
+import type { AppUser } from './auth-operations';
+
+// Type BlockActor : qui a bloqué la carte (PARENT ou CHILD), ou null si non
+// bloquée. Conforme à l'enum backend BlockActor.
+export type BlockActor = 'PARENT' | 'CHILD';
+
+// Type ChildAccount : compte d'un enfant (solde, état de blocage).
+// `userId` n'est pas exposé directement en GraphQL — on passe par `user.id`.
+export type ChildAccountSummary = {
+  id: string;
+  balance: number;
+  blocked: boolean;
+  blockedBy: BlockActor | null;
+  user: AppUser;
+};
+
+// Query myChildren : liste des comptes enfants de la famille du parent.
+// Côté serveur (serverGraphQL) — le JWT est lu depuis le cookie httpOnly.
+export const MY_CHILDREN_QUERY = /* GraphQL */ `
+  query MyChildren {
+    myChildren {
+      id
+      balance
+      blocked
+      blockedBy
+      user {
+        id
+        email
+        role
+        firstName
+        lastName
+      }
+    }
+  }
+`;
+
+// Query childAccount : compte détaillé d'un enfant (solde, blocage).
+// `childId` est l'ID du User enfant (role=CHILD), pas l'ID du ChildAccount.
+export const CHILD_ACCOUNT_QUERY = /* GraphQL */ `
+  query ChildAccount($childId: ID!) {
+    childAccount(childId: $childId) {
+      id
+      balance
+      blocked
+      blockedBy
+      user {
+        id
+        email
+        role
+        firstName
+        lastName
+      }
+    }
+  }
+`;
+
+// Type TransactionType : conformes aux enums backend.
+export type TransactionType =
+  | 'RECHARGE'
+  | 'ALLOWANCE'
+  | 'EXPENSE'
+  | 'MISSION_REWARD'
+  | 'QUIZ_REWARD'
+  | 'POT_CONTRIBUTION'
+  | 'POT_WITHDRAWAL';
+
+export type CreatedBy = 'SYSTEM' | 'CHILD' | 'PARENT';
+
+export type Transaction = {
+  id: string;
+  childId: string;
+  amount: number;
+  type: TransactionType;
+  label: string | null;
+  category: string | null;
+  createdAt: string;
+  createdBy: CreatedBy;
+};
+
+// Query transactions : historique des transactions d'un enfant.
+export const TRANSACTIONS_QUERY = /* GraphQL */ `
+  query Transactions($childId: ID!) {
+    transactions(childId: $childId) {
+      id
+      childId
+      amount
+      type
+      label
+      category
+      createdAt
+      createdBy
+    }
+  }
+`;
+
+// Mutation rechargeChildAccount : recharge manuelle ponctuelle par un parent.
+export const RECHARGE_MUTATION = /* GraphQL */ `
+  mutation RechargeChildAccount($childId: ID!, $amount: Float!) {
+    rechargeChildAccount(childId: $childId, amount: $amount) {
+      id
+      amount
+      type
+      label
+      createdAt
+      createdBy
+    }
+  }
+`;
+
+// Mutation addManualExpense : dépense manuelle sur le compte d'un enfant.
+export const ADD_MANUAL_EXPENSE_MUTATION = /* GraphQL */ `
+  mutation AddManualExpense($childId: ID!, $amount: Float!, $label: String!) {
+    addManualExpense(childId: $childId, amount: $amount, label: $label) {
+      id
+      amount
+      type
+      label
+      createdAt
+      createdBy
+    }
+  }
+`;
+
+// Type WithdrawalPolicy : politique de retrait d'une cagnotte (enum backend).
+export type WithdrawalPolicy = 'ANYTIME' | 'WHEN_FULL' | 'PARENT_ONLY';
+
+// Type PotStatus : état d'une cagnotte (enum backend). OPEN = contributions
+// acceptées ; CLOSED = clôturée après un retrait, plus de contribution.
+export type PotStatus = 'OPEN' | 'CLOSED';
+
+export type Pot = {
+  id: string;
+  title: string;
+  targetAmount: number;
+  currentAmount: number;
+  publicToken: string;
+  hiddenFrom: string[];
+  withdrawalPolicy: WithdrawalPolicy;
+  status: PotStatus;
+};
+
+// Query pots : liste les cagnottes d'un enfant.
+export const POTS_QUERY = /* GraphQL */ `
+  query Pots($childId: ID!) {
+    pots(childId: $childId) {
+      id
+      title
+      targetAmount
+      currentAmount
+      publicToken
+      hiddenFrom
+      withdrawalPolicy
+      status
+    }
+  }
+`;
+
+// Mutation createPot : un parent crée une cagnotte.
+export const CREATE_POT_MUTATION = /* GraphQL */ `
+  mutation CreatePot(
+    $childId: ID!
+    $title: String!
+    $targetAmount: Float!
+    $withdrawalPolicy: WithdrawalPolicy!
+  ) {
+    createPot(
+      childId: $childId
+      title: $title
+      targetAmount: $targetAmount
+      withdrawalPolicy: $withdrawalPolicy
+    ) {
+      id
+      title
+      targetAmount
+      currentAmount
+      publicToken
+      withdrawalPolicy
+      status
+    }
+  }
+`;
+
+// Mutation withdrawFromPot : retire d'une cagnotte (parent toujours autorisé).
+export const WITHDRAW_FROM_POT_MUTATION = /* GraphQL */ `
+  mutation WithdrawFromPot($potId: ID!, $amount: Float!) {
+    withdrawFromPot(potId: $potId, amount: $amount) {
+      id
+      amount
+      type
+      createdAt
+    }
+  }
+`;
+
+// Mutation updatePot : un parent modifie une cagnotte OPEN (édition partielle).
+// Les champs title, targetAmount, withdrawalPolicy sont optionnels.
+export const UPDATE_POT_MUTATION = /* GraphQL */ `
+  mutation UpdatePot(
+    $potId: ID!
+    $title: String
+    $targetAmount: Float
+    $withdrawalPolicy: WithdrawalPolicy
+  ) {
+    updatePot(
+      potId: $potId
+      title: $title
+      targetAmount: $targetAmount
+      withdrawalPolicy: $withdrawalPolicy
+    ) {
+      id
+      title
+      targetAmount
+      currentAmount
+      publicToken
+      withdrawalPolicy
+      status
+    }
+  }
+`;
+
+// Mutation deletePot : un parent supprime une cagnotte vide (currentAmount === 0).
+export const DELETE_POT_MUTATION = /* GraphQL */ `
+  mutation DeletePot($potId: ID!) {
+    deletePot(potId: $potId)
+  }
+`;
+
+// Mutation contributeToPotPublic : don public SANS auth (@Public côté backend).
+// Appelée depuis la page /donate/[token] via le proxy /api/graphql sans JWT.
+export const CONTRIBUTE_TO_POT_PUBLIC_MUTATION = /* GraphQL */ `
+  mutation ContributeToPotPublic(
+    $publicToken: String!
+    $amount: Float!
+    $contributorName: String
+  ) {
+    contributeToPotPublic(
+      publicToken: $publicToken
+      amount: $amount
+      contributorName: $contributorName
+    ) {
+      id
+      amount
+      contributorName
+    }
+  }
+`;
+
+// Type PublicPot : projection publique d'une cagnotte (type backend dédié).
+// N'expose QUE les champs sûrs pour un donateur sans JWT — pas de childId,
+// hiddenFrom, publicToken ni d'ID interne (contrairement au type Pot complet).
+export type PublicPotData = {
+  title: string;
+  targetAmount: number;
+  currentAmount: number;
+  status: PotStatus;
+};
+
+// Query potByPublicToken : lecture publique d'une cagnotte par son token
+// (@Public côté backend). Appelée depuis la page /donate/[token] pour afficher
+// le titre, l'objectif et la progression avant le formulaire de don.
+export const POT_BY_PUBLIC_TOKEN_QUERY = /* GraphQL */ `
+  query PotByPublicToken($publicToken: String!) {
+    potByPublicToken(publicToken: $publicToken) {
+      title
+      targetAmount
+      currentAmount
+      status
+    }
+  }
+`;
+
+// Type MissionStatus : cycle de vie d'une mission (enum backend).
+export type MissionStatus =
+  | 'PENDING'
+  | 'DONE_BY_CHILD'
+  | 'VALIDATED'
+  | 'REJECTED';
+
+export type Mission = {
+  id: string;
+  title: string;
+  reward: number;
+  status: MissionStatus;
+};
+
+// Query missions : liste les missions d'un enfant.
+export const MISSIONS_QUERY = /* GraphQL */ `
+  query Missions($childId: ID!) {
+    missions(childId: $childId) {
+      id
+      title
+      reward
+      status
+    }
+  }
+`;
+
+// Mutation createMission : un parent crée une mission pour un enfant.
+export const CREATE_MISSION_MUTATION = /* GraphQL */ `
+  mutation CreateMission($childId: ID!, $title: String!, $reward: Float!) {
+    createMission(childId: $childId, title: $title, reward: $reward) {
+      id
+      title
+      reward
+      status
+    }
+  }
+`;
+
+// Mutation validateMission : un parent valide (approve=true) ou refuse
+// (approve=false) une mission marquée faite par l'enfant (DONE_BY_CHILD).
+export const VALIDATE_MISSION_MUTATION = /* GraphQL */ `
+  mutation ValidateMission($missionId: ID!, $approve: Boolean!) {
+    validateMission(missionId: $missionId, approve: $approve) {
+      id
+      title
+      reward
+      status
+    }
+  }
+`;
+
+// Mutation updateMission : un parent modifie une mission (édition partielle).
+// Les champs title, reward, status sont optionnels. Le passage à VALIDATED
+// crée la Transaction MISSION_REWARD côté backend.
+export const UPDATE_MISSION_MUTATION = /* GraphQL */ `
+  mutation UpdateMission(
+    $missionId: ID!
+    $title: String
+    $reward: Float
+    $status: MissionStatus
+  ) {
+    updateMission(
+      missionId: $missionId
+      title: $title
+      reward: $reward
+      status: $status
+    ) {
+      id
+      title
+      reward
+      status
+    }
+  }
+`;
+
+// Mutation deleteMission : un parent supprime une mission (tous statuts).
+export const DELETE_MISSION_MUTATION = /* GraphQL */ `
+  mutation DeleteMission($missionId: ID!) {
+    deleteMission(missionId: $missionId)
+  }
+`;
+
+// Mutation createChildAccount : un parent crée le compte d'un enfant.
+// Le backend vérifie l'unicité de l'email (ConflictException si déjà utilisé),
+// hash le mot de passe et rattache l'enfant à la famille du parent créateur.
+// Retourne le User enfant créé (role=CHILD).
+export const CREATE_CHILD_ACCOUNT_MUTATION = /* GraphQL */ `
+  mutation CreateChildAccount(
+    $email: String!
+    $password: String!
+    $firstName: String!
+    $lastName: String!
+  ) {
+    createChildAccount(
+      email: $email
+      password: $password
+      firstName: $firstName
+      lastName: $lastName
+    ) {
+      id
+      email
+      role
+      firstName
+      lastName
+    }
+  }
+`;
+
+// Mutation setCardBlocked : bloque (blocked=true) ou débloque (blocked=false)
+// la carte d'un enfant. Un parent est toujours autorisé. Retourne le
+// ChildAccount mis à jour (blocked, blockedBy).
+export const SET_CARD_BLOCKED_MUTATION = /* GraphQL */ `
+  mutation SetCardBlocked($childId: ID!, $blocked: Boolean!) {
+    setCardBlocked(childId: $childId, blocked: $blocked) {
+      id
+      balance
+      blocked
+      blockedBy
+      user {
+        id
+        firstName
+        lastName
+      }
+    }
+  }
+`;
+
+// Type AllowanceFrequency : fréquence du virement automatique (enum backend).
+export type AllowanceFrequency = 'WEEKLY' | 'MONTHLY';
+
+export type AllowanceRule = {
+  id: string;
+  childId: string;
+  amount: number;
+  frequency: AllowanceFrequency;
+  active: boolean;
+};
+
+// Query allowanceRules : liste les règles de virement d'un enfant.
+// nextRunAt n'est pas exposé en GraphQL (champ technique géré par le cron).
+export const ALLOWANCE_RULES_QUERY = /* GraphQL */ `
+  query AllowanceRules($childId: ID!) {
+    allowanceRules(childId: $childId) {
+      id
+      childId
+      amount
+      frequency
+      active
+    }
+  }
+`;
+
+// Mutation createAllowanceRule : un parent crée un virement automatique.
+export const CREATE_ALLOWANCE_RULE_MUTATION = /* GraphQL */ `
+  mutation CreateAllowanceRule(
+    $childId: ID!
+    $amount: Float!
+    $frequency: AllowanceFrequency!
+  ) {
+    createAllowanceRule(
+      childId: $childId
+      amount: $amount
+      frequency: $frequency
+    ) {
+      id
+      childId
+      amount
+      frequency
+      active
+    }
+  }
+`;
+
+// Mutation updateAllowanceRule : un parent modifie un virement (édition
+// partielle). Les champs amount, frequency, active sont optionnels. Un
+// changement de frequency recalcule nextRunAt côté backend.
+export const UPDATE_ALLOWANCE_RULE_MUTATION = /* GraphQL */ `
+  mutation UpdateAllowanceRule(
+    $ruleId: ID!
+    $amount: Float
+    $frequency: AllowanceFrequency
+    $active: Boolean
+  ) {
+    updateAllowanceRule(
+      ruleId: $ruleId
+      amount: $amount
+      frequency: $frequency
+      active: $active
+    ) {
+      id
+      childId
+      amount
+      frequency
+      active
+    }
+  }
+`;
+
+// Mutation deleteAllowanceRule : un parent supprime un virement.
+export const DELETE_ALLOWANCE_RULE_MUTATION = /* GraphQL */ `
+  mutation DeleteAllowanceRule($ruleId: ID!) {
+    deleteAllowanceRule(ruleId: $ruleId)
+  }
+`;

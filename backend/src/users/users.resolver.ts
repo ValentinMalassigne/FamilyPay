@@ -1,8 +1,15 @@
-import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { UseGuards } from '@nestjs/common';
+import { Args, ID, Mutation, Query, Resolver, Subscription } from '@nestjs/graphql';
+// ID est importé pour typer explicitement les @Args d'identifiant en GraphQL.
+// reflect-metadata infère `String` pour un paramètre `string`, ce qui génère un
+// arg `String!` dans le schéma. Or PROJECT_CONTEXT.md §6 exige `ID!` pour les
+// identifiants (childId, missionId, potId...). Sans ce typage explicit, une
+// variable `$childId: ID!` côté client est rejetée par validation GraphQL
+// ("Variable of type ID! used in position expecting type String!").
+import { UseGuards, ForbiddenException, NotFoundException, Inject } from '@nestjs/common';
+import { PubSub } from 'graphql-subscriptions';
 import { UsersService } from './users.service.js';
 import { User, Role } from './entities/user.entity.js';
-import { GqlAuthGuard } from '../common/auth.guard.js';
+import { ChildAccount } from './entities/child-account.entity.js';
 import { RolesGuard } from '../common/roles.guard.js';
 import { Roles } from '../common/roles.decorator.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
@@ -15,16 +22,27 @@ import type { JwtPayload } from '../common/types.js';
  * Le () => User indique que ce resolver gère les field resolvers du type User
  * (ici il n'y en a pas, mais c'est aussi utilisé pour les query/mutation
  * qui retournent des User).
+ *
+ * Authentification : GqlAuthGuard est registered globallement via APP_GUARD
+ * dans AppModule → tous les resolvers exigent un JWT valide par défaut, sans
+ * besoin de @UseGuards(GqlAuthGuard) sur chaque méthode. Les exceptions
+ * publiques sont marquées @Public() (voir AuthResolver).
  */
 @Resolver(() => User)
 export class UsersResolver {
-  constructor(private usersService: UsersService) {}
+  // PubSub injecté via le token 'PUB_SUB' (PubSubModule @Global). Utilisé par
+  // la subscription cardBlocked pour exposer un AsyncIterator sur le topic
+  // CARD_BLOCKED_{childId} publié par UsersService.setCardBlocked.
+  constructor(
+    private usersService: UsersService,
+    @Inject('PUB_SUB') private pubSub: PubSub,
+  ) {}
 
   /*
    * Query me : retourne l'utilisateur courant (authentifié via JWT).
    *
-   * @UseGuards(GqlAuthGuard) : exige un JWT valide. Le guard vérifie le token
-   * et pose le payload dans req.user (accessible via @CurrentUser()).
+   * Pas de @UseGuards ici : GqlAuthGuard (global via APP_GUARD) vérifie déjà
+   * le JWT et pose le payload dans req.user (accessible via @CurrentUser()).
    *
    * @CurrentUser() user : extrait le payload JWT (JwtPayload) du contexte.
    * On a l'ID (sub), on charge l'utilisateur complet depuis la DB.
@@ -32,7 +50,6 @@ export class UsersResolver {
    * Schéma généré : me: User!
    */
   @Query(() => User)
-  @UseGuards(GqlAuthGuard)
   async me(@CurrentUser() user: JwtPayload): Promise<User> {
     const fullUser = await this.usersService.findById(user.sub);
     if (!fullUser) {
@@ -42,11 +59,117 @@ export class UsersResolver {
   }
 
   /*
+   * Query myChildAccount : retourne le ChildAccount de l'enfant authentifié.
+   *
+   * Schéma §6 (ajout) : myChildAccount: ChildAccount!
+   *
+   * @UseGuards(RolesGuard) + @Roles(Role.CHILD) : seul un enfant consulte
+   * SON propre compte. GqlAuthGuard (global via APP_GUARD) vérifie le JWT au
+   * préalable. Un parent n'a pas accès à cette query — il utilise
+   * childAccount(childId) ou myChildren.
+   *
+   * @CurrentUser() user : payload JWT de l'enfant (user.sub = son User ID,
+   * qui sert de childId partout dans le backend).
+   *
+   * L'enfant a besoin de cette query pour récupérer son solde initial et
+   * l'état de blocage de sa carte au chargement de l'app, car :
+   *  - me retourne un User (pas de balance, pas de blocked).
+   *  - childAccount(childId) est @Roles(Role.PARENT) — inaccessible à l'enfant.
+   *  - balanceUpdated (subscription) ne se déclenche qu'en cas de changement,
+   *    pas au chargement initial.
+   *
+   * @throws NotFoundException si l'enfant n'a pas de ChildAccount (cas anormal).
+   */
+  @Query(() => ChildAccount)
+  @UseGuards(RolesGuard)
+  @Roles(Role.CHILD)
+  async myChildAccount(@CurrentUser() user: JwtPayload): Promise<ChildAccount> {
+    const account = await this.usersService.findChildAccountByUserId(user.sub);
+    if (!account) {
+      throw new NotFoundException('Compte enfant non trouvé');
+    }
+    return account;
+  }
+
+  /*
+   * Query childAccount : retourne le compte d'un enfant (solde, blocage).
+   *
+   * Schéma §6 : childAccount(childId: ID!): ChildAccount!
+   *
+   * @UseGuards(RolesGuard) + @Roles(Role.PARENT) : seul un parent consulte
+   * le compte d'un enfant. GqlAuthGuard (global) vérifie le JWT au préalable.
+   *
+   * @Args('childId') childId : ID du User enfant (role=CHILD).
+   * @CurrentUser() user : payload JWT du parent.
+   *
+   * Règle métier : l'enfant doit faire partie de la même famille que le
+   * parent. On vérifie en chargeant le User enfant et en comparant familyId.
+   *
+   * @throws NotFoundException si l'enfant ou son ChildAccount n'existe pas.
+   * @throws ForbiddenException si l'enfant n'est pas dans la famille du parent.
+   */
+  @Query(() => ChildAccount)
+  @UseGuards(RolesGuard)
+  @Roles(Role.PARENT)
+  async childAccount(
+    @CurrentUser() user: JwtPayload,
+    @Args('childId', { type: () => ID }) childId: string,
+  ): Promise<ChildAccount> {
+    // Vérifier que l'enfant existe et fait partie de la même famille.
+    const child = await this.usersService.findById(childId);
+    if (!child) {
+      throw new NotFoundException('Enfant non trouvé');
+    }
+    if (child.familyId !== user.familyId) {
+      throw new ForbiddenException(
+        "Vous n'avez pas accès au compte de cet enfant",
+      );
+    }
+
+    // Charger le ChildAccount lié à ce User enfant.
+    const account = await this.usersService.findChildAccountByUserId(childId);
+    if (!account) {
+      throw new NotFoundException('Compte enfant non trouvé');
+    }
+    return account;
+  }
+
+  /*
+   * Query myChildren : retourne la liste des comptes enfants de la famille
+   * du parent authentifié (solde, état de blocage, et user chargé).
+   *
+   * Évolution du schéma §6 (non listée dans l'esquisse) : l'espace parent a
+   * besoin de lister ses enfants pour afficher le dashboard. C'est une
+   * évolution backend autorisée (PR backend d'abord).
+   *
+   * Schéma généré : myChildren: [ChildAccount!]!
+   *
+   * Guards :
+   * - GqlAuthGuard (global via APP_GUARD) vérifie le JWT au préalable et
+   *   place le payload dans le contexte.
+   * - @UseGuards(RolesGuard) + @Roles(Role.PARENT) : seul un PARENT peut
+   *   lister les enfants d'une famille. Un enfant n'a pas accès à cette
+   *   query (il ne voit que son propre compte).
+   *
+   * Filtrage par famille : on passe user.familyId (issu du JWT) au service.
+   * Un parent ne peut ainsi voir QUE les enfants de SA famille — pas besoin
+   * de vérification supplémentaire, le filtre SQL est fait en base.
+   *
+   * @CurrentUser() user : payload JWT du parent (contient familyId).
+   */
+  @Query(() => [ChildAccount])
+  @UseGuards(RolesGuard)
+  @Roles(Role.PARENT)
+  async myChildren(@CurrentUser() user: JwtPayload): Promise<ChildAccount[]> {
+    return this.usersService.findChildrenByFamilyId(user.familyId);
+  }
+
+  /*
    * Mutation createChildAccount : un parent crée un compte enfant.
    *
-   * @UseGuards(GqlAuthGuard, RolesGuard) :
-   *   1. GqlAuthGuard vérifie le JWT et pose req.user.
-   *   2. RolesGuard vérifie que req.user.role est dans @Roles(...).
+   * @UseGuards(RolesGuard) : GqlAuthGuard est global (APP_GUARD), on n'a plus
+   * besoin de le lister. On garde RolesGuard pour vérifier @Roles(Role.PARENT).
+   * NestJS exécute d'abord le guard global (GqlAuthGuard), puis RolesGuard.
    *
    * @Roles(Role.PARENT) : seul un parent peut créer un compte enfant.
    *
@@ -54,7 +177,7 @@ export class UsersResolver {
    * createdByUserId = l'ID du parent créateur (user.sub).
    */
   @Mutation(() => User)
-  @UseGuards(GqlAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles(Role.PARENT)
   async createChildAccount(
     @CurrentUser() creator: JwtPayload,
@@ -80,7 +203,7 @@ export class UsersResolver {
    * Pas de ChildAccount créé (seuls les enfants ont un solde).
    */
   @Mutation(() => User)
-  @UseGuards(GqlAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles(Role.PARENT)
   async createParentAccount(
     @CurrentUser() creator: JwtPayload,
@@ -97,5 +220,66 @@ export class UsersResolver {
       creatorId: creator.sub,
       creatorFamilyId: creator.familyId,
     });
+  }
+
+  /*
+   * Mutation setCardBlocked : bloque ou débloque la carte d'un enfant.
+   *
+   * Schéma §6 : setCardBlocked(childId: ID!, blocked: Boolean!): ChildAccount!
+   *
+   * GqlAuthGuard (global) vérifie le JWT. Pas de @Roles ici : un parent OU
+   * l'enfant lui-même peut bloquer/débloquer, mais la règle métier blockedBy
+   * est gérée dans le service :
+   *  - Parent → toujours autorisé (bloque avec blockedBy=PARENT, ou débloque).
+   *  - Enfant → bloqué si la carte est déjà bloquée par un parent (blockedBy=PARENT).
+   *
+   * @Args('childId') : ID de l'enfant dont on bloque/débloque la carte.
+   * @Args('blocked') : true = bloquer, false = débloquer.
+   * @CurrentUser() user : payload JWT (rôle PARENT ou CHILD).
+   */
+  @Mutation(() => ChildAccount)
+  async setCardBlocked(
+    @CurrentUser() user: JwtPayload,
+    @Args('childId', { type: () => ID }) childId: string,
+    @Args('blocked') blocked: boolean,
+  ): Promise<ChildAccount> {
+    return this.usersService.setCardBlocked({
+      childId,
+      blocked,
+      requesterId: user.sub,
+      requesterRole: user.role,
+      requesterFamilyId: user.familyId,
+    });
+  }
+
+  /*
+   * Subscription cardBlocked : notifie en temps réel quand l'état de blocage
+   * de la carte d'un enfant change (bloquée ou débloquée).
+   *
+   * Schéma §6 : cardBlocked(childId: ID!): ChildAccount!
+   *
+   * Fonctionnement des subscriptions GraphQL (voir balanceUpdated dans
+   * transactions.resolver.ts) :
+   *   1. Le client s'abonne via une requête subscription.
+   *   2. Le resolver retourne un AsyncIterator (via pubSub.asyncIterator).
+   *   3. Quand setCardBlocked publie l'événement CARD_BLOCKED_{childId}, tous
+   *      les clients abonnés à ce childId reçoivent le ChildAccount mis à jour.
+   *
+   * Cas d'usage côté mobile : HomeScreen souscrit pour afficher un SnackBar
+   * "Carte bloquée par un parent" / "Carte débloquée", que le changement
+   * provienne du parent (depuis le dashboard web) ou de l'enfant lui-même.
+   *
+   * @Args('childId') childId : ID de l'enfant dont on suit l'état de blocage.
+   *
+   * Filtre : le client ne reçoit que les événements pour le childId spécifié.
+   * On compare payload.cardBlocked.userId (le ChildAccount porte userId, qui
+   * vaut l'ID du User enfant = childId) à la variable childId de la subscription.
+   */
+  @Subscription(() => ChildAccount, {
+    filter: (payload, variables) =>
+      payload.cardBlocked.userId === variables.childId,
+  })
+  cardBlocked(@Args('childId', { type: () => ID }) childId: string) {
+    return this.pubSub.asyncIterator(`CARD_BLOCKED_${childId}`);
   }
 }

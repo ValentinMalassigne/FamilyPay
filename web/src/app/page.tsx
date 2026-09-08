@@ -1,13 +1,13 @@
-import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { getTokenFromCookie } from '@/lib/graphql-server';
 
-// Page d'accueil publique. Pour l'instant un simple point d'entrée qui
-// redirige vers l'espace parent. L'auth viendra dans une branche suivante.
-export default function HomePage() {
-  return (
-    <main style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif' }}>
-      <h1>FamilyPay</h1>
-      <p>Gestion d&apos;argent de poche pour ados.</p>
-      <Link href="/parent">Espace parent</Link>
-    </main>
-  );
+// Page d'accueil publique.
+//
+// Redirige vers /parent si l'utilisateur a un cookie httpOnly valide
+// (présence du cookie ; la validité du token est vérifiée côté /parent via
+// la query `me`), sinon vers /login. On ne fait pas de redirection côté client
+// pour éviter un flash : le Server Component décide avant le rendu.
+export default async function HomePage() {
+  const token = await getTokenFromCookie();
+  redirect(token ? '/parent' : '/login');
 }

@@ -3,16 +3,17 @@
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-familypay}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+    # PG18+ stocke les données dans un sous-dossier version-spécifique sous
+    # /var/lib/postgresql (pas /var/lib/postgresql/data comme en PG16/17).
+    # Monter à la racine permet à pg_upgrade de fonctionner sans frontière de mount.
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-familypay}"]
       interval: 5s
@@ -35,8 +36,6 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       MISTRAL_API_KEY: ${MISTRAL_API_KEY}
       BACKEND_PORT: ${BACKEND_PORT:-3000}
-    ports:
-      - "${BACKEND_PORT:-3000}:3000"
 
   nextjs:
     build:
@@ -46,12 +45,33 @@ services:
     depends_on:
       - backend
     environment:
+      # GRAPHQL_URL (server-side) : URL du backend GraphQL vue DEPUIS le
+      # container nextjs, sur le réseau Docker interne. En compose, les
+      # services communiquent via leur nom de service → "backend" résout vers
+      # l'IP du container backend. "localhost" ici désignerait le container
+      # nextjs lui-même (où tourne Next.js, pas le backend) → ECONNREFUSED.
+      # Valeur littérale (pas d'interpolation .env) : c'est une constante du
+      # réseau compose, pas une config environnement-spécifique.
+      GRAPHQL_URL: http://backend:3000/graphql
       # NEXT_PUBLIC_* est lue au build Next.js et baked dans le bundle client.
       # Elle doit pointer vers une URL accessible depuis le navigateur (pas
       # depuis le réseau Docker) → http://localhost:3000/graphql en dev local.
       NEXT_PUBLIC_GRAPHQL_URL: ${NEXT_PUBLIC_GRAPHQL_URL:-http://localhost:3000/graphql}
+      # COOKIE_SECURE : false tant qu'on sert en HTTP plain (pas de TLS).
+      # Passer à "true" quand HTTPS sera en place (ALB / Nginx + certbot).
+      COOKIE_SECURE: "false"
+
+  # Reverse proxy Nginx : seul point d'entrée public (port 80).
+  # Route / vers nextjs et /graphql vers backend (HTTP + WebSocket pour
+  # les subscriptions du mobile). Backend et Postgres restent internes.
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    depends_on: [nextjs, backend]
     ports:
-      - "${WEB_PORT:-3001}:3000"
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
 
   # Optionnel : pub/sub pour les subscriptions GraphQL (décommenter si besoin)
   # redis:

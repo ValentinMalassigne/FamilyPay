@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException, Inject } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PubSub } from 'graphql-subscriptions';
@@ -86,11 +86,24 @@ export class TransactionsService {
       );
     }
 
-    // 2. Mettre à jour le solde
-    childAccount.balance += params.amount;
+    // 2. Vérifier que le solde ne passe pas en négatif.
+    // Règle métier (PROJECT_CONTEXT.md §4) : un solde négatif est formellement
+    // interdit — on simule une carte bancaire pour ados, pas un découvert.
+    // Les crédits (amount > 0 : RECHARGE, ALLOWANCE, MISSION_REWARD...) sont
+    // toujours autorisés. Seuls les débits (amount < 0 : EXPENSE,
+    // POT_WITHDRAWAL...) sont plafonnés au solde courant.
+    const newBalance = childAccount.balance + params.amount;
+    if (newBalance < 0) {
+      throw new BadRequestException(
+        `Solde insuffisant : le solde (${childAccount.balance}) ne peut pas passer en négatif`,
+      );
+    }
+
+    // 3. Mettre à jour le solde
+    childAccount.balance = newBalance;
     const updatedAccount = await this.childAccountRepository.save(childAccount);
 
-    // 3. Créer la transaction
+    // 4. Créer la transaction
     const transaction = this.transactionRepository.create({
       childId: params.childId,
       amount: params.amount,
@@ -100,16 +113,23 @@ export class TransactionsService {
       createdBy: params.createdBy,
     });
 
-    // 4. Sauvegarder la transaction
+    // 5. Sauvegarder la transaction
     const savedTransaction = await this.transactionRepository.save(transaction);
 
-    // 5. Publier l'événement pour la subscription balanceUpdated
-    // L'événement est publié avec le childId comme clé pour filtrer les abonnements.
+    // 6. Publier les événements pour les subscriptions temps réel
+    // balanceUpdated : notifie les clients qui suivent le solde de l'enfant.
+    // transactionAdded : notifie les clients qui suivent les nouvelles
+    //   transactions de l'enfant (ex: historique temps réel sur le mobile).
+    // Les deux événements sont publiés avec le childId comme clé de topic
+    // pour le filtrage côté subscription.
     this.pubSub.publish(`BALANCE_UPDATED_${params.childId}`, {
       balanceUpdated: updatedAccount,
     });
+    this.pubSub.publish(`TRANSACTION_ADDED_${params.childId}`, {
+      transactionAdded: savedTransaction,
+    });
 
-    // 6. Retourner la transaction
+    // 7. Retourner la transaction
     return savedTransaction;
   }
 
