@@ -16,7 +16,6 @@ final kMyChildAccountQuery = gql(r'''
   query MyChildAccount {
     myChildAccount {
       id
-      userId
       balance
       blocked
       blockedBy
