@@ -14,6 +14,7 @@ import 'tabs/balance_tab.dart';
 import 'tabs/missions_tab.dart';
 import 'tabs/pots_tab.dart';
 import 'tabs/transactions_tab.dart';
+import 'settings_screen.dart';
 
 /// Écran d'accueil de l'app enfant : scaffold avec bottom navigation à 4 onglets.
 ///
@@ -208,6 +209,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       appBar: AppBar(
         title: const Text('FamilyPay'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: 'Réglages',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Déconnexion',

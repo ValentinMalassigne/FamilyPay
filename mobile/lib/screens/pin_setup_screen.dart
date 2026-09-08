@@ -14,8 +14,10 @@ import '../widgets/pin_keypad.dart';
 /// persiste le PIN), ce qui déverrouille l'app — l'AuthGate rebascule alors
 /// vers HomeScreen.
 ///
-/// L'opt-in biométrique est géré dans le commit 3 (ajout d'un prompt après
-/// la création du PIN si le device le supporte).
+/// Si le device supporte la biométrie (Touch ID / Face ID / empreinte), un
+/// prompt d'opt-in s'affiche après la création du PIN : l'utilisateur peut
+/// activer le déverrouillage biométrique (modifiable plus tard dans les
+/// réglages).
 class PinSetupScreen extends StatefulWidget {
   const PinSetupScreen({super.key});
 
@@ -61,6 +63,14 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
       // Confirmation : on compare avec la première saisie.
       if (_currentInput == _firstPin) {
         final lockService = context.read<LockService>();
+        // Si le device supporte la biométrie, on propose l'opt-in avant de
+        // déverrouiller (setPin déclenche le rebasculement vers HomeScreen).
+        if (lockService.biometricAvailable) {
+          final enable = await _showBiometricOptIn();
+          if (enable == true) {
+            await lockService.enableBiometric();
+          }
+        }
         await lockService.setPin(_currentInput);
         // L'AuthGate va rebasculer vers HomeScreen (pinSet=true, unlocked=true).
       } else {
@@ -73,6 +83,32 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
         });
       }
     }
+  }
+
+  /// Affiche un dialogue demandant à l'utilisateur s'il veut activer le
+  /// déverrouillage biométrique. Retourne true si l'utilisateur accepte.
+  Future<bool?> _showBiometricOptIn() {
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Déverrouillage biométrique'),
+        content: const Text(
+          'Veux-tu activer le déverrouillage par empreinte ou Face ID ? '
+          'Tu pourras toujours utiliser ton code PIN en fallback.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Plus tard'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Activer'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

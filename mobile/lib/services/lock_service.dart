@@ -1,5 +1,7 @@
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:local_auth/local_auth.dart';
 
 import 'secure_storage_service.dart';
 
@@ -19,9 +21,14 @@ import 'secure_storage_service.dart';
 /// aussi pour centraliser l'état de verrouillage. Les méthodes biométriques
 /// sont ajoutées dans le commit 3.
 class LockService extends ChangeNotifier {
-  LockService(this._storage);
+  LockService(this._storage, {LocalAuthentication? localAuth})
+      : _localAuth = localAuth ?? LocalAuthentication();
 
   final SecureStorageService _storage;
+
+  // Plugin local_auth : accède à Touch ID / Face ID (iOS) et empreinte /
+  // visage (Android). Injecté en paramètre pour permettre les tests.
+  final LocalAuthentication _localAuth;
 
   /// Un code PIN a-t-il été configuré ? (persisté)
   bool _pinSet = false;
@@ -35,7 +42,7 @@ class LockService extends ChangeNotifier {
   bool _biometricEnabled = false;
   bool get biometricEnabled => _biometricEnabled;
 
-  /// Le device supporte-t-il l'auth biométrique ? Renseigné par le commit 3.
+  /// Le device supporte-t-il l'auth biométrique ? Renseigné dans init().
   bool _biometricAvailable = false;
   bool get biometricAvailable => _biometricAvailable;
 
@@ -44,6 +51,9 @@ class LockService extends ChangeNotifier {
   Future<void> init() async {
     _pinSet = await _storage.hasPin();
     _biometricEnabled = await _storage.isBiometricEnabled();
+    // Vérifie si le device supporte la biométrie (Touch ID / Face ID /
+    // empreinte). Si non, l'opt-in biométrique ne sera pas proposé.
+    _biometricAvailable = await _localAuth.canCheckBiometrics;
     // Au démarrage, l'app n'est jamais déverrouillée si un PIN est défini.
     _unlocked = !_pinSet;
     notifyListeners();
@@ -124,17 +134,32 @@ class LockService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Renseigne si le device supporte la biométrie (appelé depuis le commit 3
-  /// après vérification via local_auth).
+  /// Renseigne si le device supporte la biométrie (utile pour les tests).
   void setBiometricAvailable(bool available) {
     _biometricAvailable = available;
     notifyListeners();
   }
 
-  /// Tente l'authentification biométrique. Implémenté dans le commit 3.
-  /// Retourne true si l'auth réussit et déverrouille l'app.
+  /// Tente l'authentification biométrique (Touch ID / Face ID / empreinte).
+  ///
+  /// `biometricOnly: true` empêche le fallback vers le PIN/pattern du device :
+  /// l'app a déjà son propre écran de PIN en fallback. Retourne true et
+  /// déverrouille l'app si l'auth réussit.
   Future<bool> authenticateWithBiometrics() async {
-    // Implémenté dans le commit 3 (local_auth).
-    return false;
+    if (!_biometricAvailable) return false;
+    try {
+      final ok = await _localAuth.authenticate(
+        localizedReason: 'Déverrouille FamilyPay',
+        options: const AuthenticationOptions(biometricOnly: true),
+      );
+      if (ok) {
+        _unlock();
+      }
+      return ok;
+    } on PlatformException {
+      // Échec biométrique (capteur indisponible, utilisateur annule…) :
+      // l'utilisateur peut retomber sur la saisie manuelle du PIN.
+      return false;
+    }
   }
 }

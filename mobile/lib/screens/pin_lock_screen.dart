@@ -14,7 +14,10 @@ import '../widgets/pin_keypad.dart';
 /// Si le PIN est faux, on déclenche une animation de secousse (shake) et
 /// on vide les chiffres.
 ///
-/// Le bouton biométrique (empreinte / Face ID) est ajouté dans le commit 3.
+/// Si l'utilisateur a activé la biométrie et que le device la supporte,
+/// un bouton empreinte s'affiche : il déclenche
+/// [LockService.authenticateWithBiometrics]. En cas d'échec biométrique,
+/// l'utilisateur retombe sur la saisie manuelle du PIN.
 class PinLockScreen extends StatefulWidget {
   const PinLockScreen({super.key});
 
@@ -76,8 +79,19 @@ class _PinLockScreenState extends State<PinLockScreen>
     }
   }
 
+  /// Tente le déverrouillage biométrique. Si l'auth réussit, LockService
+  /// déverrouille l'app et l'AuthGate rebascule vers HomeScreen.
+  Future<void> _tryBiometrics() async {
+    final lockService = context.read<LockService>();
+    await lockService.authenticateWithBiometrics();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final lockService = context.watch<LockService>();
+    final showBiometric =
+        lockService.biometricEnabled && lockService.biometricAvailable;
+
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -111,6 +125,16 @@ class _PinLockScreenState extends State<PinLockScreen>
               onKeyPressed: _onKeyPressed,
               onDeletePressed: _onDeletePressed,
             ),
+            // Bouton biométrique : affiché seulement si l'utilisateur l'a
+            // activé ET que le device le supporte.
+            if (showBiometric) ...[
+              const SizedBox(height: 16),
+              IconButton(
+                icon: const Icon(Icons.fingerprint, size: 40),
+                onPressed: _tryBiometrics,
+                tooltip: 'Déverrouillage biométrique',
+              ),
+            ],
             const SizedBox(height: 48),
           ],
         ),

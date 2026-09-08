@@ -52,6 +52,27 @@ void _setupSecureStorageMock() {
   });
 }
 
+// Mock du method channel de local_auth : on simule un device sans
+// biométrie (canCheckBiometrics retourne false). Les méthodes
+// authenticate/getAvailableBiometrics renvoient une réponse vide.
+const _localAuthChannel = MethodChannel('plugins.flutter.io/local_auth');
+
+void _setupLocalAuthMock() {
+  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+      .setMockMethodCallHandler(_localAuthChannel, (MethodCall call) async {
+    switch (call.method) {
+      case 'getAvailableBiometrics':
+        return <String>[]; // vide → deviceSupportsBiometrics = false
+      case 'authenticate':
+        return false;
+      case 'isDeviceSupported':
+        return false;
+      default:
+        return null;
+    }
+  });
+}
+
 // Construit un utilisateur factice pour les tests.
 final _fakeUser = AppUser(
   id: '1',
@@ -84,11 +105,14 @@ void main() {
   setUp(() {
     _mockStore.clear();
     _setupSecureStorageMock();
+    _setupLocalAuthMock();
   });
 
   tearDown(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(_channel, null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(_localAuthChannel, null);
   });
 
   testWidgets('affiche l\'écran de login quand non authentifié',
