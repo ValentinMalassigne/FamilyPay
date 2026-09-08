@@ -6,7 +6,8 @@ import 'package:graphql_flutter/graphql_flutter.dart';
 import '../../graphql/child_operations.dart';
 import '../../models/child_account.dart';
 
-/// Onglet Solde : affiche le solde de l'enfant en grand + section blocage carte.
+/// Onglet Accueil : affiche le solde de l'enfant en grand + section blocage carte
+/// + résumés (dernière opération, dernière cagnotte, dernière mission).
 ///
 /// - `Query` `myChildAccount` → charge le solde initial.
 /// - `Subscription` `balanceUpdated` → met à jour le solde en temps réel
@@ -17,17 +18,17 @@ import '../../models/child_account.dart';
 ///
 /// Si `blockedBy == "PARENT"` : le Switch est désactivé + message informatif.
 /// Sinon (`"CHILD"` ou null) : l'enfant peut basculer le Switch.
-class BalanceTab extends StatefulWidget {
-  const BalanceTab({super.key, required this.childId});
+class HomeTab extends StatefulWidget {
+  const HomeTab({super.key, required this.childId});
 
   /// user.id de l'enfant (= childId pour tout le backend).
   final String childId;
 
   @override
-  State<BalanceTab> createState() => _BalanceTabState();
+  State<HomeTab> createState() => _HomeTabState();
 }
 
-class _BalanceTabState extends State<BalanceTab> {
+class _HomeTabState extends State<HomeTab> {
   /// Compte courant : initialisé par la query, puis mis à jour par la
   /// subscription `balanceUpdated` (solde), la subscription `cardBlocked`
   /// (état de blocage) et la mutation `setCardBlocked`.

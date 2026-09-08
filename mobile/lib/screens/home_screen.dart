@@ -10,7 +10,7 @@ import '../models/transaction.dart';
 import '../services/auth_service.dart';
 import '../services/lock_service.dart';
 import '../utils/token_store.dart';
-import 'tabs/balance_tab.dart';
+import 'tabs/home_tab.dart';
 import 'tabs/missions_tab.dart';
 import 'tabs/pots_tab.dart';
 import 'tabs/transactions_tab.dart';
@@ -199,7 +199,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
 
     final tabs = [
-      BalanceTab(childId: childId),
+      HomeTab(childId: childId),
       TransactionsTab(childId: childId),
       PotsTab(childId: childId),
       MissionsTab(childId: childId),
