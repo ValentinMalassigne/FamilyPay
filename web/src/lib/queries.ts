@@ -251,6 +251,30 @@ export const CONTRIBUTE_TO_POT_PUBLIC_MUTATION = /* GraphQL */ `
   }
 `;
 
+// Type PublicPot : projection publique d'une cagnotte (type backend dédié).
+// N'expose QUE les champs sûrs pour un donateur sans JWT — pas de childId,
+// hiddenFrom, publicToken ni d'ID interne (contrairement au type Pot complet).
+export type PublicPotData = {
+  title: string;
+  targetAmount: number;
+  currentAmount: number;
+  status: PotStatus;
+};
+
+// Query potByPublicToken : lecture publique d'une cagnotte par son token
+// (@Public côté backend). Appelée depuis la page /donate/[token] pour afficher
+// le titre, l'objectif et la progression avant le formulaire de don.
+export const POT_BY_PUBLIC_TOKEN_QUERY = /* GraphQL */ `
+  query PotByPublicToken($publicToken: String!) {
+    potByPublicToken(publicToken: $publicToken) {
+      title
+      targetAmount
+      currentAmount
+      status
+    }
+  }
+`;
+
 // Type MissionStatus : cycle de vie d'une mission (enum backend).
 export type MissionStatus =
   | 'PENDING'

@@ -152,6 +152,16 @@ type Pot {
   status: PotStatus!
 }
 
+# Type de projection en lecture seule exposé par la query publique
+# potByPublicToken. Ne contient que les champs sûrs visibles par un donateur
+# externe sans JWT (pas de childId, hiddenFrom, publicToken ni d'ID interne).
+type PublicPot {
+  title: String!
+  targetAmount: Float!
+  currentAmount: Float!
+  status: PotStatus!
+}
+
 type Mission {
   id: ID!
   title: String!
@@ -173,6 +183,7 @@ type Query {
   childAccount(childId: ID!): ChildAccount!
   transactions(childId: ID!): [Transaction!]!
   pots(childId: ID!): [Pot!]!
+  potByPublicToken(publicToken: String!): PublicPot!
   missions(childId: ID!): [Mission!]!
   aiInsights(childId: ID!): [AIInsight!]!
 }
@@ -212,6 +223,8 @@ type Subscription {
 ```
 
 **Note sur `contributeToPotPublic`** : c'est la seule mutation accessible sans JWT (page publique Next.js). Elle doit être exclue du guard d'authentification global, avec sa propre validation (token de cagnotte valide, montant positif, éventuel throttling anti-abus).
+
+**Note sur `potByPublicToken`** : query publique (sans JWT) en lecture seule, elle aussi exclue du guard d'authentification global. Elle renvoie un `PublicPot` réduit (title, targetAmount, currentAmount, status) — jamais le type `Pot` complet, pour ne pas divulger `childId`, `hiddenFrom` ou l'ID interne à un donateur externe.
 
 ## 7. Fonctionnalité IA — Coach budget (Mistral)
 

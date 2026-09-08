@@ -1,14 +1,19 @@
 'use client';
 
 import { use, useState, FormEvent } from 'react';
-import { useMutation } from '@apollo/client/react';
+import { useMutation, useQuery } from '@apollo/client/react';
 import { gql } from '@apollo/client';
-import { CONTRIBUTE_TO_POT_PUBLIC_MUTATION } from '@/lib/queries';
+import {
+  CONTRIBUTE_TO_POT_PUBLIC_MUTATION,
+  POT_BY_PUBLIC_TOKEN_QUERY,
+  type PublicPotData,
+} from '@/lib/queries';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Progress } from '@/components/ui/progress';
 import { ImagePlaceholder } from '@/components/image-placeholder';
 
 // Page publique de don sur cagnotte (Client Component, SANS auth).
@@ -18,10 +23,12 @@ import { ImagePlaceholder } from '@/components/image-placeholder';
 // aucun JWT n'est requis. Le proxy /api/graphql transmet la requête sans
 // header Authorization quand le cookie httpOnly est absent (donateur externe).
 //
-// Le backend n'expose pas de query publique pour récupérer une cagnotte par
-// token : on ne peut afficher que le formulaire avec le token en paramètre.
-// Afficher le titre/objectif de la cagnotte nécessiterait une query publique
-// backend (hors scope de cette PR).
+// La query publique `potByPublicToken` (@Public côté backend) récupère le
+// titre, l'objectif et le montant actuel de la cagnotte pour afficher une
+// barre de progression avant le formulaire. Le type retourné (PublicPot)
+// n'expose que les champs sûrs — pas de childId, hiddenFrom ni d'ID interne.
+// Après un don réussi, on appelle refetch() pour rafraîchir la progression en
+// direct. Si la cagnotte est CLOSED ou introuvable, le formulaire est désactivé.
 //
 // Throttling anti-abus côté UI : le bouton est désactivé pendant la soumission
 // et on empêche les doubles-clics (le backend valide aussi le plafond).
@@ -31,6 +38,25 @@ export default function DonatePage({
   params: Promise<{ token: string }>;
 }) {
   const { token: publicToken } = use(params);
+
+  // Query publique de la cagnotte : titre, objectif, montant actuel, statut.
+  // Pas de JWT — la query est marquée @Public() côté backend. On récupère
+  // refetch pour rafraîchir la progression après un don réussi.
+  const {
+    data: potData,
+    loading: potLoading,
+    error: potError,
+    refetch,
+  } = useQuery<{ potByPublicToken: PublicPotData }>(
+    gql(POT_BY_PUBLIC_TOKEN_QUERY),
+    { variables: { publicToken } },
+  );
+
+  const pot = potData?.potByPublicToken;
+  const isClosed = pot?.status === 'CLOSED';
+  // Le formulaire est désactivé tant qu'on ne sait pas si la cagnotte est
+  // ouverte : en cours de chargement, en erreur (introuvable) ou clôturée.
+  const formDisabled = potLoading || !!potError || isClosed;
 
   const [amount, setAmount] = useState('');
   const [contributorName, setContributorName] = useState('');
@@ -60,6 +86,8 @@ export default function DonatePage({
       setSuccess(`Merci ! Votre don de ${value.toFixed(2)} € a été enregistré.`);
       setAmount('');
       setContributorName('');
+      // Rafraîchir la progression : currentAmount a augmenté côté backend.
+      refetch();
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Erreur lors du don',
@@ -73,12 +101,43 @@ export default function DonatePage({
         <CardHeader className="items-center text-center">
           {/* TODO: replace with actual donate illustration */}
           <ImagePlaceholder className="size-16" />
-          <CardTitle className="text-2xl">Contribuer à une cagnotte</CardTitle>
-          <CardDescription className="font-mono text-xs">
+          <CardTitle className="text-2xl">
+            {pot ? pot.title : 'Contribuer à une cagnotte'}
+          </CardTitle>
+          {/* <CardDescription className="font-mono text-xs">
             {publicToken}
-          </CardDescription>
+          </CardDescription> */}
         </CardHeader>
         <CardContent>
+          {potError && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>
+                Cagnotte introuvable. Vérifiez le lien de don.
+              </AlertDescription>
+            </Alert>
+          )}
+          {pot && !potError && (
+            <div className="mb-4 flex flex-col gap-2">
+              <Progress
+                value={
+                  pot.targetAmount > 0
+                    ? Math.min(100, (pot.currentAmount / pot.targetAmount) * 100)
+                    : 0
+                }
+              />
+              <p className="text-center text-sm text-muted-foreground">
+                {pot.currentAmount.toLocaleString('fr-FR')} € sur{' '}
+                {pot.targetAmount.toLocaleString('fr-FR')} €
+              </p>
+            </div>
+          )}
+          {isClosed && !potError && (
+            <Alert className="mb-4">
+              <AlertDescription>
+                Cette cagnotte est clôturée — les contributions ne sont plus acceptées.
+              </AlertDescription>
+            </Alert>
+          )}
           {success && (
             <Alert variant="success" className="mb-4">
               <AlertDescription>{success}</AlertDescription>
@@ -95,6 +154,7 @@ export default function DonatePage({
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 required
+                disabled={formDisabled}
               />
             </div>
             <div className="flex flex-col gap-2">
@@ -104,6 +164,7 @@ export default function DonatePage({
                 type="text"
                 value={contributorName}
                 onChange={(e) => setContributorName(e.target.value)}
+                disabled={formDisabled}
               />
             </div>
             {error && (
@@ -111,7 +172,7 @@ export default function DonatePage({
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading || formDisabled}>
               {loading ? 'Envoi…' : 'Faire un don'}
             </Button>
           </form>
