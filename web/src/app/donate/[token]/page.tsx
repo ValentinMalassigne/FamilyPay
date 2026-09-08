@@ -104,9 +104,9 @@ export default function DonatePage({
           <CardTitle className="text-2xl">
             {pot ? pot.title : 'Contribuer à une cagnotte'}
           </CardTitle>
-          <CardDescription className="font-mono text-xs">
+          {/* <CardDescription className="font-mono text-xs">
             {publicToken}
-          </CardDescription>
+          </CardDescription> */}
         </CardHeader>
         <CardContent>
           {potError && (
