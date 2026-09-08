@@ -5,6 +5,7 @@ import { UseGuards, Inject } from '@nestjs/common';
 import { PubSub } from 'graphql-subscriptions';
 import { PotsService } from './pots.service.js';
 import { Pot, WithdrawalPolicy } from './entities/pot.entity.js';
+import { PublicPot } from './entities/public-pot.entity.js';
 import { PotContribution } from './entities/pot-contribution.entity.js';
 import { Transaction } from '../transactions/entities/transaction.entity.js';
 import { RolesGuard } from '../common/roles.guard.js';
@@ -24,6 +25,7 @@ import type { JwtPayload } from '../common/types.js';
  *
  * Resolvers définis :
  * - Query pots : liste les cagnottes d'un enfant (parent ou enfant lui-même).
+ * - Query potByPublicToken : lecture publique d'une cagnotte par son token (@Public()).
  * - Mutation createPot : un parent crée une cagnotte (PARENT only).
  * - Mutation contributeToPotPublic : don public SANS auth (@Public()).
  * - Mutation withdrawFromPot : retrait d'une cagnotte (parent ou enfant selon policy).
@@ -58,6 +60,45 @@ export class PotsResolver {
     @Args('childId', { type: () => ID }) childId: string,
   ): Promise<Pot[]> {
     return this.potsService.getPotsForChild(childId, user);
+  }
+
+  /*
+   * Query potByPublicToken : lecture publique d'une cagnotte par son token.
+   *
+   * Schéma §6 : potByPublicToken(publicToken: String!): PublicPot!
+   *
+   * @Public() : exclut cette query du GqlAuthGuard global. C'est une route
+   *   non authentifiée, au même titre que contributeToPotPublic (PROJECT_CONTEXT
+   *   §8). La page de don /donate/[token] (Next.js, sans JWT) l'appelle pour
+   *   afficher le titre, l'objectif et la progression avant le formulaire.
+   *   Pas de @CurrentUser() ici : il n'y a pas de JWT.
+   *
+   * Sécurité — pourquoi PublicPot et pas Pot :
+   *   Le type Pot complet expose childId, hiddenFrom, publicToken, l'ID interne…
+   *   autant de données internes qu'un appelant anonyme ne doit pas voir. On
+   *   retourne donc un PublicPot (type de projection, voir
+   *   public-pot.entity.ts) ne contenant que title, targetAmount, currentAmount
+   *   et status. Le mapping Pot → PublicPot se fait ici explicitement champ par
+   *   champ pour garantir qu'aucun champ interne n'est divulgué par oubli.
+   *
+   * Lecture seule : cette query ne modifie rien. La mutation publique d'écriture
+   *   reste contributeToPotPublic. On réutilise le service existant
+   *   getPotByPublicToken (qui lève NotFoundException si le token est inconnu).
+   *
+   * @Args('publicToken') publicToken : UUID exposé dans l'URL de don public.
+   */
+  @Query(() => PublicPot)
+  @Public()
+  async potByPublicToken(
+    @Args('publicToken') publicToken: string,
+  ): Promise<PublicPot> {
+    const pot = await this.potsService.getPotByPublicToken(publicToken);
+    return {
+      title: pot.title,
+      targetAmount: pot.targetAmount,
+      currentAmount: pot.currentAmount,
+      status: pot.status,
+    };
   }
 
   /*
