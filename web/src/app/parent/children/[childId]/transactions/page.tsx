@@ -7,6 +7,17 @@ import {
   type Transaction,
   type ChildAccountSummary,
 } from '@/lib/queries';
+import { BackLink } from '@/components/back-link';
+import { Button } from '@/components/ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 
 // Historique des transactions d'un enfant (Server Component, auth JWT parent).
 //
@@ -49,66 +60,71 @@ export default async function TransactionsPage({
   const transactions = txResult.data?.transactions ?? [];
 
   return (
-    <main style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif' }}>
-      <p>
-        <Link href={`/parent/children/${childId}`}>← Retour</Link>
-      </p>
-      <h1>
-        Transactions — {account.user.firstName} {account.user.lastName}
-      </h1>
-      <p>Solde : {account.balance.toFixed(2)} €</p>
+    <div className="flex flex-col gap-6">
+      <BackLink href={`/parent/children/${childId}`} />
 
-      <p style={{ marginTop: '1rem' }}>
-        <Link href={`/parent/children/${childId}/recharge`}>Recharger</Link>
-        {' · '}
-        <Link href={`/parent/children/${childId}/expense`}>
-          Ajouter une dépense
-        </Link>
-      </p>
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Transactions — {account.user.firstName} {account.user.lastName}
+        </h1>
+        <p className="mt-1 text-muted-foreground">
+          Solde : {account.balance.toFixed(2)} €
+        </p>
+      </div>
 
-      <h2 style={{ marginTop: '1.5rem' }}>Historique</h2>
-      {transactions.length === 0 ? (
-        <p style={{ color: '#888' }}>Aucune transaction.</p>
-      ) : (
-        <table
-          style={{
-            borderCollapse: 'collapse',
-            width: '100%',
-            marginTop: '1rem',
-          }}
-        >
-          <thead>
-            <tr style={{ textAlign: 'left', borderBottom: '2px solid #ccc' }}>
-              <th style={{ padding: '0.5rem' }}>Date</th>
-              <th style={{ padding: '0.5rem' }}>Libellé</th>
-              <th style={{ padding: '0.5rem' }}>Montant</th>
-              <th style={{ padding: '0.5rem' }}>Type</th>
-              <th style={{ padding: '0.5rem' }}>Catégorie</th>
-            </tr>
-          </thead>
-          <tbody>
-            {transactions.map((tx) => (
-              <tr key={tx.id} style={{ borderBottom: '1px solid #eee' }}>
-                <td style={{ padding: '0.5rem' }}>
-                  {new Date(tx.createdAt).toLocaleDateString('fr-FR')}
-                </td>
-                <td style={{ padding: '0.5rem' }}>{tx.label ?? '—'}</td>
-                <td
-                  style={{
-                    padding: '0.5rem',
-                    color: tx.amount >= 0 ? '#080' : '#c00',
-                  }}
-                >
-                  {tx.amount >= 0 ? '+' : ''}
-                  {tx.amount.toFixed(2)} €
-                </td>
-                <td style={{ padding: '0.5rem' }}>{tx.type}</td>
-                <td style={{ padding: '0.5rem' }}>{tx.category ?? '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </main>
+      <div className="flex gap-2">
+        <Button asChild variant="default" size="sm">
+          <Link href={`/parent/children/${childId}/recharge`}>Recharger</Link>
+        </Button>
+        <Button asChild variant="outline" size="sm">
+          <Link href={`/parent/children/${childId}/expense`}>
+            Ajouter une dépense
+          </Link>
+        </Button>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">Historique</h2>
+        {transactions.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Aucune transaction.</p>
+        ) : (
+          <div className="rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Libellé</TableHead>
+                  <TableHead>Montant</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Catégorie</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {transactions.map((tx) => (
+                  <TableRow key={tx.id}>
+                    <TableCell>
+                      {new Date(tx.createdAt).toLocaleDateString('fr-FR')}
+                    </TableCell>
+                    <TableCell>{tx.label ?? '—'}</TableCell>
+                    <TableCell
+                      className={cn(
+                        tx.amount >= 0
+                          ? 'text-success font-medium'
+                          : 'text-destructive font-medium',
+                      )}
+                    >
+                      {tx.amount >= 0 ? '+' : ''}
+                      {tx.amount.toFixed(2)} €
+                    </TableCell>
+                    <TableCell>{tx.type}</TableCell>
+                    <TableCell>{tx.category ?? '—'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

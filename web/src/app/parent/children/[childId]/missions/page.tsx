@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { serverGraphQL, getTokenFromCookie } from '@/lib/graphql-server';
 import {
@@ -7,6 +6,9 @@ import {
   type Mission,
   type ChildAccountSummary,
 } from '@/lib/queries';
+import { BackLink } from '@/components/back-link';
+import { Card, CardContent } from '@/components/ui/card';
+import { StatusBadge } from '@/components/status-badge';
 import { CreateMissionForm, ValidateMissionButtons, EditMissionForm, DeleteMissionButton } from './MissionActions';
 
 // Liste des missions d'un enfant (Server Component, auth JWT parent).
@@ -18,13 +20,6 @@ import { CreateMissionForm, ValidateMissionButtons, EditMissionForm, DeleteMissi
 // Badges de statut colorés : PENDING (gris), DONE_BY_CHILD (orange — en attente
 // de validation parent), VALIDATED (vert), REJECTED (rouge). Les boutons
 // Valider/Refuser ne s'affichent que pour DONE_BY_CHILD.
-const STATUS_COLORS: Record<string, string> = {
-  PENDING: '#888',
-  DONE_BY_CHILD: '#c80',
-  VALIDATED: '#080',
-  REJECTED: '#c00',
-};
-
 const STATUS_LABELS: Record<string, string> = {
   PENDING: 'En attente',
   DONE_BY_CHILD: 'Faite par l’enfant',
@@ -68,56 +63,47 @@ export default async function MissionsPage({
   const missions = missionsResult.data?.missions ?? [];
 
   return (
-    <main style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif' }}>
-      <p>
-        <Link href={`/parent/children/${childId}`}>← Retour</Link>
-      </p>
-      <h1>
+    <div className="flex flex-col gap-6">
+      <BackLink href={`/parent/children/${childId}`} />
+
+      <h1 className="text-2xl font-semibold tracking-tight">
         Missions — {account.user.firstName} {account.user.lastName}
       </h1>
 
-      <h2 style={{ marginTop: '1.5rem' }}>Missions</h2>
-      {missions.length === 0 ? (
-        <p style={{ color: '#888' }}>Aucune mission.</p>
-      ) : (
-        <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: '1rem' }}>
-          {missions.map((mission) => (
-            <li
-              key={mission.id}
-              style={{
-                border: '1px solid #ddd',
-                borderRadius: '8px',
-                padding: '1rem',
-              }}
-            >
-              <strong>{mission.title}</strong>
-              <div style={{ marginTop: '0.5rem' }}>
-                Récompense : {mission.reward.toFixed(2)} €
-              </div>
-              <div style={{ marginTop: '0.25rem' }}>
-                <span
-                  style={{
-                    color: '#fff',
-                    background: STATUS_COLORS[mission.status] ?? '#888',
-                    padding: '0.15rem 0.5rem',
-                    borderRadius: '4px',
-                    fontSize: '0.85rem',
-                  }}
-                >
-                  {STATUS_LABELS[mission.status] ?? mission.status}
-                </span>
-              </div>
-              {mission.status === 'DONE_BY_CHILD' && (
-                <ValidateMissionButtons missionId={mission.id} />
-              )}
-              <EditMissionForm mission={mission} />
-              <DeleteMissionButton missionId={mission.id} />
-            </li>
-          ))}
-        </ul>
-      )}
+      <div className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">Missions</h2>
+        {missions.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Aucune mission.</p>
+        ) : (
+          <div className="grid gap-4">
+            {missions.map((mission) => (
+              <Card key={mission.id}>
+                <CardContent className="flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold">{mission.title}</span>
+                    <StatusBadge
+                      status={mission.status}
+                      label={STATUS_LABELS[mission.status] ?? mission.status}
+                    />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Récompense : {mission.reward.toFixed(2)} €
+                  </p>
+                  {mission.status === 'DONE_BY_CHILD' && (
+                    <ValidateMissionButtons missionId={mission.id} />
+                  )}
+                  <div className="flex gap-2">
+                    <EditMissionForm mission={mission} />
+                    <DeleteMissionButton missionId={mission.id} />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
 
       <CreateMissionForm params={params} />
-    </main>
+    </div>
   );
 }

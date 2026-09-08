@@ -4,6 +4,12 @@ import { use, useState, FormEvent } from 'react';
 import { useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client';
 import { CONTRIBUTE_TO_POT_PUBLIC_MUTATION } from '@/lib/queries';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ImagePlaceholder } from '@/components/image-placeholder';
 
 // Page publique de don sur cagnotte (Client Component, SANS auth).
 //
@@ -62,44 +68,55 @@ export default function DonatePage({
   }
 
   return (
-    <main style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif' }}>
-      <h1>Contribuer à une cagnotte</h1>
-      <p style={{ color: '#888' }}>
-        Cagnotte : <code>{publicToken}</code>
-      </p>
-
-      {success && <p style={{ color: '#080' }}>{success}</p>}
-
-      <form
-        onSubmit={handleSubmit}
-        style={{ marginTop: '1rem', maxWidth: '24rem' }}
-      >
-        <label>
-          Montant (€) :
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            required
-            style={{ display: 'block', margin: '0.5rem 0' }}
-          />
-        </label>
-        <label>
-          Votre nom (optionnel) :
-          <input
-            type="text"
-            value={contributorName}
-            onChange={(e) => setContributorName(e.target.value)}
-            style={{ display: 'block', margin: '0.5rem 0' }}
-          />
-        </label>
-        {error && <p style={{ color: '#c00' }}>{error}</p>}
-        <button type="submit" disabled={loading}>
-          {loading ? 'Envoi…' : 'Faire un don'}
-        </button>
-      </form>
+    <main className="flex min-h-screen items-center justify-center px-4 py-8">
+      <Card className="w-full max-w-md">
+        <CardHeader className="items-center text-center">
+          {/* TODO: replace with actual donate illustration */}
+          <ImagePlaceholder className="size-16" />
+          <CardTitle className="text-2xl">Contribuer à une cagnotte</CardTitle>
+          <CardDescription className="font-mono text-xs">
+            {publicToken}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {success && (
+            <Alert variant="success" className="mb-4">
+              <AlertDescription>{success}</AlertDescription>
+            </Alert>
+          )}
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="donate-amount">Montant (€)</Label>
+              <Input
+                id="donate-amount"
+                type="number"
+                step="0.01"
+                min="0"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                required
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="donate-name">Votre nom (optionnel)</Label>
+              <Input
+                id="donate-name"
+                type="text"
+                value={contributorName}
+                onChange={(e) => setContributorName(e.target.value)}
+              />
+            </div>
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Envoi…' : 'Faire un don'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </main>
   );
 }

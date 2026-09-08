@@ -1,5 +1,8 @@
 import { type ReactNode } from 'react';
+import { GeistSans } from 'geist/font/sans';
+import { GeistMono } from 'geist/font/mono';
 import { ApolloProviderWrapper } from '@/components/ApolloProviderWrapper';
+import './globals.css';
 
 // Layout racine de l'app Next.js (App Router).
 //
@@ -14,7 +17,9 @@ export const metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="fr">
-      <body>
+      <body
+        className={`${GeistSans.variable} ${GeistMono.variable} font-sans antialiased`}
+      >
         <ApolloProviderWrapper>{children}</ApolloProviderWrapper>
       </body>
     </html>

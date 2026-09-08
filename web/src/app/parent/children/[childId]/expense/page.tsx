@@ -1,11 +1,16 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { use, useState, FormEvent } from 'react';
 import { useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client';
 import { ADD_MANUAL_EXPENSE_MUTATION } from '@/lib/queries';
+import { BackLink } from '@/components/back-link';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 // Formulaire d'ajout d'une dépense manuelle (Client Component).
 //
@@ -51,39 +56,52 @@ export default function ExpensePage({
   }
 
   return (
-    <main style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif' }}>
-      <p>
-        <Link href={`/parent/children/${childId}/transactions`}>← Retour</Link>
-      </p>
-      <h1>Ajouter une dépense</h1>
-      <form onSubmit={handleSubmit} style={{ marginTop: '1rem' }}>
-        <label>
-          Libellé :
-          <input
-            type="text"
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            required
-            style={{ display: 'block', margin: '0.5rem 0' }}
-          />
-        </label>
-        <label>
-          Montant (€) :
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            required
-            style={{ display: 'block', margin: '0.5rem 0' }}
-          />
-        </label>
-        {error && <p style={{ color: '#c00' }}>{error}</p>}
-        <button type="submit" disabled={loading}>
-          {loading ? 'Ajout…' : 'Ajouter la dépense'}
-        </button>
-      </form>
-    </main>
+    <div className="flex flex-col gap-6">
+      <BackLink href={`/parent/children/${childId}/transactions`} />
+
+      <h1 className="text-2xl font-semibold tracking-tight">
+        Ajouter une dépense
+      </h1>
+
+      <Card className="max-w-md">
+        <CardHeader>
+          <CardTitle className="text-base">Dépense manuelle</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="expense-label">Libellé</Label>
+              <Input
+                id="expense-label"
+                type="text"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                required
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="expense-amount">Montant (€)</Label>
+              <Input
+                id="expense-amount"
+                type="number"
+                step="0.01"
+                min="0"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                required
+              />
+            </div>
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Ajout…' : 'Ajouter la dépense'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

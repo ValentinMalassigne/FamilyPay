@@ -3,6 +3,12 @@
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ImagePlaceholder } from '@/components/image-placeholder';
 
 // Formulaire de connexion (Client Component) extrait de login/page.tsx.
 //
@@ -55,37 +61,57 @@ export default function LoginForm() {
   }
 
   return (
-    <main style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif', maxWidth: 420 }}>
-      <h1>Connexion parent</h1>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <label>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            autoComplete="email"
-          />
-        </label>
-        <label>
-          Mot de passe
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            autoComplete="current-password"
-          />
-        </label>
-        {error && <p style={{ color: 'crimson' }}>{error}</p>}
-        <button type="submit" disabled={loading}>
-          {loading ? 'Connexion…' : 'Se connecter'}
-        </button>
-      </form>
-      <p style={{ marginTop: '1rem' }}>
-        Pas encore de famille ? <Link href="/signup">Créer un compte</Link>
-      </p>
+    <main className="flex min-h-screen items-center justify-center px-4 py-8">
+      <Card className="w-full max-w-md">
+        <CardHeader className="items-center text-center">
+          {/* TODO: replace with actual logo image */}
+          <ImagePlaceholder className="size-12" />
+          <CardTitle className="text-2xl">Connexion parent</CardTitle>
+          <CardDescription>
+            Accède à l&apos;espace de gestion de l&apos;argent de poche
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="password">Mot de passe</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+              />
+            </div>
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Connexion…' : 'Se connecter'}
+            </Button>
+          </form>
+          <p className="mt-4 text-center text-sm text-muted-foreground">
+            Pas encore de famille ?{' '}
+            <Link href="/signup" className="font-medium text-foreground underline-offset-4 hover:underline">
+              Créer un compte
+            </Link>
+          </p>
+        </CardContent>
+      </Card>
     </main>
   );
 }

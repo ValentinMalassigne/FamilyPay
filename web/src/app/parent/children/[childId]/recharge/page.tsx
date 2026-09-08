@@ -1,11 +1,16 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { use, useState, FormEvent } from 'react';
 import { useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client';
 import { RECHARGE_MUTATION } from '@/lib/queries';
+import { BackLink } from '@/components/back-link';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 // Formulaire de recharge manuelle (Client Component).
 //
@@ -45,29 +50,42 @@ export default function RechargePage({
   }
 
   return (
-    <main style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif' }}>
-      <p>
-        <Link href={`/parent/children/${childId}/transactions`}>← Retour</Link>
-      </p>
-      <h1>Recharger le compte</h1>
-      <form onSubmit={handleSubmit} style={{ marginTop: '1rem' }}>
-        <label>
-          Montant (€) :
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            required
-            style={{ display: 'block', margin: '0.5rem 0' }}
-          />
-        </label>
-        {error && <p style={{ color: '#c00' }}>{error}</p>}
-        <button type="submit" disabled={loading}>
-          {loading ? 'Recharge…' : 'Recharger'}
-        </button>
-      </form>
-    </main>
+    <div className="flex flex-col gap-6">
+      <BackLink href={`/parent/children/${childId}/transactions`} />
+
+      <h1 className="text-2xl font-semibold tracking-tight">
+        Recharger le compte
+      </h1>
+
+      <Card className="max-w-md">
+        <CardHeader>
+          <CardTitle className="text-base">Recharge manuelle</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="recharge-amount">Montant (€)</Label>
+              <Input
+                id="recharge-amount"
+                type="number"
+                step="0.01"
+                min="0"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                required
+              />
+            </div>
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Recharge…' : 'Recharger'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

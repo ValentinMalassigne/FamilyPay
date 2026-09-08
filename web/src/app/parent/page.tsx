@@ -6,7 +6,9 @@ import {
   MY_CHILDREN_QUERY,
   type ChildAccountSummary,
 } from '@/lib/queries';
-import { LogoutButton } from './LogoutButton';
+import { Card, CardContent } from '@/components/ui/card';
+import { StatusBadge } from '@/components/status-badge';
+import { ImagePlaceholder } from '@/components/image-placeholder';
 import { AddChildForm } from './AddChildForm';
 
 // Espace parent (protégé par auth JWT parent).
@@ -45,64 +47,60 @@ export default async function ParentPage() {
   const children = childrenResult.data?.myChildren ?? [];
 
   return (
-    <main style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif' }}>
-      <h1>Espace parent</h1>
-      <p>
-        Bonjour {me.firstName} {me.lastName} ({me.email})
-      </p>
-      <LogoutButton />
+    <div className="flex flex-col gap-8">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Espace parent</h1>
+        <p className="mt-1 text-muted-foreground">
+          Bonjour {me.firstName} {me.lastName}
+        </p>
+      </div>
 
-      <h2 style={{ marginTop: '2rem' }}>Mes enfants</h2>
-
-      {children.length === 0 ? (
-        <p style={{ color: '#888' }}>Aucun enfant pour le moment.</p>
-      ) : (
-        <ul
-          style={{
-            listStyle: 'none',
-            padding: 0,
-            display: 'grid',
-            gap: '1rem',
-          }}
-        >
-          {children.map((child) => (
-            <li
-              key={child.id}
-              style={{
-                border: '1px solid #ddd',
-                borderRadius: '8px',
-                padding: '1rem',
-              }}
-            >
+      <section>
+        <h2 className="mb-4 text-lg font-semibold">Mes enfants</h2>
+        {children.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Aucun enfant pour le moment.
+          </p>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {children.map((child) => (
               <Link
+                key={child.id}
                 href={`/parent/children/${child.user.id}`}
-                style={{ textDecoration: 'none', color: 'inherit' }}
+                className="block"
               >
-                <strong>
-                  {child.user.firstName} {child.user.lastName}
-                </strong>
-                <div style={{ marginTop: '0.5rem' }}>
-                  Solde : {child.balance.toFixed(2)} €
-                </div>
-                <div>
-                  Carte :{' '}
-                  {child.blocked ? (
-                    <span style={{ color: '#c00' }}>
-                      Bloquée
-                      {child.blockedBy === 'PARENT' ? ' (par un parent)' : ''}
-                    </span>
-                  ) : (
-                    <span style={{ color: '#080' }}>Active</span>
-                  )}
-                </div>
+                <Card className="transition-colors hover:bg-accent">
+                  <CardContent className="flex items-center gap-4">
+                    {/* TODO: replace with actual avatar image */}
+                    <ImagePlaceholder className="size-10 shrink-0 rounded-full" />
+                    <div className="flex flex-1 flex-col gap-1">
+                      <span className="font-medium">
+                        {child.user.firstName} {child.user.lastName}
+                      </span>
+                      <span className="text-sm text-muted-foreground">
+                        Solde : {child.balance.toFixed(2)} €
+                      </span>
+                      <StatusBadge
+                        status={child.blocked ? 'BLOCKED' : 'ACTIVE'}
+                        label={
+                          child.blocked
+                            ? `Bloquée${child.blockedBy === 'PARENT' ? ' (par un parent)' : ''}`
+                            : 'Active'
+                        }
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
               </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+            ))}
+          </div>
+        )}
+      </section>
 
-      <h2 style={{ marginTop: '2rem' }}>Ajouter un enfant</h2>
-      <AddChildForm />
-    </main>
+      <section>
+        <h2 className="mb-4 text-lg font-semibold">Ajouter un enfant</h2>
+        <AddChildForm />
+      </section>
+    </div>
   );
 }

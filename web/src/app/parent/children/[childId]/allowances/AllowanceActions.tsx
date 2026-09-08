@@ -11,6 +11,18 @@ import {
   type AllowanceFrequency,
   type AllowanceRule,
 } from '@/lib/queries';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 // Formulaire de création de virement automatique (Client Component).
 //
@@ -52,44 +64,50 @@ export function CreateAllowanceForm({
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      style={{
-        marginTop: '1.5rem',
-        border: '1px solid #ddd',
-        borderRadius: '8px',
-        padding: '1rem',
-      }}
-    >
-      <h3>Créer un virement automatique</h3>
-      <label>
-        Montant (€) :
-        <input
-          type="number"
-          step="0.01"
-          min="0"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          required
-          style={{ display: 'block', margin: '0.5rem 0' }}
-        />
-      </label>
-      <label>
-        Fréquence :
-        <select
-          value={frequency}
-          onChange={(e) => setFrequency(e.target.value as AllowanceFrequency)}
-          style={{ display: 'block', margin: '0.5rem 0' }}
-        >
-          <option value="WEEKLY">Hebdomadaire (WEEKLY)</option>
-          <option value="MONTHLY">Mensuel (MONTHLY)</option>
-        </select>
-      </label>
-      {error && <p style={{ color: '#c00' }}>{error}</p>}
-      <button type="submit" disabled={loading}>
-        {loading ? 'Création…' : 'Créer le virement'}
-      </button>
-    </form>
+    <Card className="max-w-md">
+      <CardHeader>
+        <CardTitle className="text-base">Créer un virement automatique</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="create-allowance-amount">Montant (€)</Label>
+            <Input
+              id="create-allowance-amount"
+              type="number"
+              step="0.01"
+              min="0"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              required
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label>Fréquence</Label>
+            <Select
+              value={frequency}
+              onValueChange={(val) => setFrequency(val as AllowanceFrequency)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="WEEKLY">Hebdomadaire (WEEKLY)</SelectItem>
+                <SelectItem value="MONTHLY">Mensuel (MONTHLY)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          <Button type="submit" disabled={loading}>
+            {loading ? 'Création…' : 'Créer le virement'}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -136,76 +154,87 @@ export function EditAllowanceForm({ rule }: { rule: AllowanceRule }) {
 
   if (!editing) {
     return (
-      <div style={{ marginTop: '0.5rem' }}>
-        <button type="button" onClick={() => setEditing(true)}>
-          Modifier
-        </button>
-      </div>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => setEditing(true)}
+      >
+        Modifier
+      </Button>
     );
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      style={{
-        marginTop: '0.5rem',
-        border: '1px solid #ddd',
-        borderRadius: '8px',
-        padding: '1rem',
-      }}
-    >
-      <h4>Modifier le virement</h4>
-      <label>
-        Montant (€) :
-        <input
-          type="number"
-          step="0.01"
-          min="0"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          required
-          style={{ display: 'block', margin: '0.5rem 0' }}
-        />
-      </label>
-      <label>
-        Fréquence :
-        <select
-          value={frequency}
-          onChange={(e) => setFrequency(e.target.value as AllowanceFrequency)}
-          style={{ display: 'block', margin: '0.5rem 0' }}
-        >
-          {FREQUENCIES.map((f) => (
-            <option key={f} value={f}>
-              {f === 'WEEKLY' ? 'Hebdomadaire (WEEKLY)' : 'Mensuel (MONTHLY)'}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        <input
-          type="checkbox"
-          checked={active}
-          onChange={(e) => setActive(e.target.checked)}
-          style={{ marginRight: '0.5rem' }}
-        />
-        Actif
-      </label>
-      {error && <p style={{ color: '#c00' }}>{error}</p>}
-      <button type="submit" disabled={loading}>
-        {loading ? 'Enregistrement…' : 'Enregistrer'}
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          setEditing(false);
-          setError(null);
-        }}
-        disabled={loading}
-        style={{ marginLeft: '0.5rem' }}
-      >
-        Annuler
-      </button>
-    </form>
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm">Modifier le virement</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor={`edit-allowance-amount-${rule.id}`}>Montant (€)</Label>
+            <Input
+              id={`edit-allowance-amount-${rule.id}`}
+              type="number"
+              step="0.01"
+              min="0"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              required
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label>Fréquence</Label>
+            <Select
+              value={frequency}
+              onValueChange={(val) => setFrequency(val as AllowanceFrequency)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {FREQUENCIES.map((f) => (
+                  <SelectItem key={f} value={f}>
+                    {f === 'WEEKLY' ? 'Hebdomadaire (WEEKLY)' : 'Mensuel (MONTHLY)'}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <label className="flex items-center gap-2 text-sm font-medium">
+            <input
+              type="checkbox"
+              checked={active}
+              onChange={(e) => setActive(e.target.checked)}
+              className="size-4 rounded border-input"
+            />
+            Actif
+          </label>
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          <div className="flex gap-2">
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Enregistrement…' : 'Enregistrer'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setEditing(false);
+                setError(null);
+              }}
+              disabled={loading}
+            >
+              Annuler
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -228,16 +257,21 @@ export function DeleteAllowanceButton({ ruleId }: { ruleId: string }) {
   }
 
   return (
-    <div style={{ marginTop: '0.5rem' }}>
-      <button
+    <div className="flex flex-col gap-2">
+      <Button
         type="button"
+        variant="destructive"
+        size="sm"
         onClick={handleDelete}
         disabled={loading}
-        style={{ color: '#c00' }}
       >
         {loading ? 'Suppression…' : 'Supprimer'}
-      </button>
-      {error && <p style={{ color: '#c00' }}>{error}</p>}
+      </Button>
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 }

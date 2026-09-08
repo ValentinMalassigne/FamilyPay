@@ -7,6 +7,12 @@ import {
   type Pot,
   type ChildAccountSummary,
 } from '@/lib/queries';
+import { BackLink } from '@/components/back-link';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Separator } from '@/components/ui/separator';
 import { CreatePotForm, WithdrawPotButton, EditPotForm, DeletePotButton } from './PotActions';
 
 // Liste des cagnottes d'un enfant (Server Component, auth JWT parent).
@@ -55,82 +61,82 @@ export default async function PotsPage({
   const pots = potsResult.data?.pots ?? [];
 
   return (
-    <main style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif' }}>
-      <p>
-        <Link href={`/parent/children/${childId}`}>← Retour</Link>
-      </p>
-      <h1>
+    <div className="flex flex-col gap-6">
+      <BackLink href={`/parent/children/${childId}`} />
+
+      <h1 className="text-2xl font-semibold tracking-tight">
         Cagnottes — {account.user.firstName} {account.user.lastName}
       </h1>
 
-      <h2 style={{ marginTop: '1.5rem' }}>Cagnottes existantes</h2>
-      {pots.length === 0 ? (
-        <p style={{ color: '#888' }}>Aucune cagnotte.</p>
-      ) : (
-        <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: '1rem' }}>
-          {pots.map((pot) => {
-            const pct =
-              pot.targetAmount > 0
-                ? Math.min(100, (pot.currentAmount / pot.targetAmount) * 100)
-                : 0;
-            return (
-              <li
-                key={pot.id}
-                style={{
-                  border: '1px solid #ddd',
-                  borderRadius: '8px',
-                  padding: '1rem',
-                }}
-              >
-                <strong>{pot.title}</strong>
-                {pot.status === 'CLOSED' && (
-                  <span
-                    style={{
-                      marginLeft: '0.5rem',
-                      padding: '0.1rem 0.4rem',
-                      background: '#eee',
-                      borderRadius: '4px',
-                      fontSize: '0.8rem',
-                      color: '#666',
-                    }}
-                  >
-                    Clôturée
-                  </span>
-                )}
-                <div style={{ marginTop: '0.5rem' }}>
-                  {pot.currentAmount.toFixed(2)} € / {pot.targetAmount.toFixed(2)} €
-                  {' '}({pct.toFixed(0)} %)
-                </div>
-                <div style={{ color: '#888' }}>
-                  Politique : {pot.withdrawalPolicy}
-                </div>
-                {pot.status === 'OPEN' && (
-                  <>
-                    <div style={{ marginTop: '0.5rem' }}>
-                      <Link href={`/donate/${pot.publicToken}`}>
-                        Lien public de don
-                      </Link>
+      <div className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">Cagnottes existantes</h2>
+        {pots.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Aucune cagnotte.</p>
+        ) : (
+          <div className="grid gap-4">
+            {pots.map((pot) => {
+              const pct =
+                pot.targetAmount > 0
+                  ? Math.min(100, (pot.currentAmount / pot.targetAmount) * 100)
+                  : 0;
+              return (
+                <Card key={pot.id}>
+                  <CardContent className="flex flex-col gap-4">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold">{pot.title}</span>
+                      {pot.status === 'CLOSED' && (
+                        <Badge variant="outline">Clôturée</Badge>
+                      )}
                     </div>
-                    <div style={{ marginTop: '0.5rem' }}>
-                      <WithdrawPotButton
-                        potId={pot.id}
-                        currentAmount={pot.currentAmount}
-                      />
+
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span>
+                          {pot.currentAmount.toFixed(2)} € /{' '}
+                          {pot.targetAmount.toFixed(2)} €
+                        </span>
+                        <span className="text-muted-foreground">
+                          {pct.toFixed(0)} %
+                        </span>
+                      </div>
+                      <Progress value={pct} />
                     </div>
-                    <EditPotForm pot={pot} />
-                  </>
-                )}
-                <DeletePotButton
-                  potId={pot.id}
-                  currentAmount={pot.currentAmount}
-                />
-              </li>
-            );
-          })}
-        </ul>
-      )}
+
+                    <p className="text-sm text-muted-foreground">
+                      Politique : {pot.withdrawalPolicy}
+                    </p>
+
+                    {pot.status === 'OPEN' && (
+                      <>
+                        <Separator />
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button asChild variant="outline" size="sm">
+                            <Link href={`/donate/${pot.publicToken}`}>
+                              Lien public de don
+                            </Link>
+                          </Button>
+                          <WithdrawPotButton
+                            potId={pot.id}
+                            currentAmount={pot.currentAmount}
+                          />
+                        </div>
+                        <EditPotForm pot={pot} />
+                      </>
+                    )}
+
+                    <DeletePotButton
+                      potId={pot.id}
+                      currentAmount={pot.currentAmount}
+                    />
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       <CreatePotForm params={params} />
-    </main>
+    </div>
   );
 }

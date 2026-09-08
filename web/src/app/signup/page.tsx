@@ -3,6 +3,12 @@
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ImagePlaceholder } from '@/components/image-placeholder';
 
 // Page d'inscription (POST /api/auth/signup).
 //
@@ -48,37 +54,84 @@ export default function SignupPage() {
   }
 
   return (
-    <main style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif', maxWidth: 420 }}>
-      <h1>Créer ma famille</h1>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <label>
-          Prénom
-          <input value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
-        </label>
-        <label>
-          Nom
-          <input value={lastName} onChange={(e) => setLastName(e.target.value)} required />
-        </label>
-        <label>
-          Email
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
-        </label>
-        <label>
-          Mot de passe
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password" />
-        </label>
-        <label>
-          Nom de la famille
-          <input value={familyName} onChange={(e) => setFamilyName(e.target.value)} required />
-        </label>
-        {error && <p style={{ color: 'crimson' }}>{error}</p>}
-        <button type="submit" disabled={loading}>
-          {loading ? 'Création…' : 'Créer la famille'}
-        </button>
-      </form>
-      <p style={{ marginTop: '1rem' }}>
-        Déjà un compte ? <Link href="/login">Se connecter</Link>
-      </p>
+    <main className="flex min-h-screen items-center justify-center px-4 py-8">
+      <Card className="w-full max-w-md">
+        <CardHeader className="items-center text-center">
+          {/* TODO: replace with actual logo image */}
+          <ImagePlaceholder className="size-12" />
+          <CardTitle className="text-2xl">Créer ma famille</CardTitle>
+          <CardDescription>
+            Crée ton compte parent et ta première famille
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="firstName">Prénom</Label>
+              <Input
+                id="firstName"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                required
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="lastName">Nom</Label>
+              <Input
+                id="lastName"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                required
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="password">Mot de passe</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="new-password"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="familyName">Nom de la famille</Label>
+              <Input
+                id="familyName"
+                value={familyName}
+                onChange={(e) => setFamilyName(e.target.value)}
+                required
+              />
+            </div>
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Création…' : 'Créer la famille'}
+            </Button>
+          </form>
+          <p className="mt-4 text-center text-sm text-muted-foreground">
+            Déjà un compte ?{' '}
+            <Link href="/login" className="font-medium text-foreground underline-offset-4 hover:underline">
+              Se connecter
+            </Link>
+          </p>
+        </CardContent>
+      </Card>
     </main>
   );
 }

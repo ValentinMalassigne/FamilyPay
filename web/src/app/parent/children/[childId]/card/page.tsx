@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { serverGraphQL, getTokenFromCookie } from '@/lib/graphql-server';
 import { CHILD_ACCOUNT_QUERY, type ChildAccountSummary } from '@/lib/queries';
+import { BackLink } from '@/components/back-link';
 import { CardBlockToggle } from './CardBlockToggle';
 
 // Page de gestion de carte (Server Component, auth JWT parent).
@@ -42,16 +43,23 @@ export default async function CardPage({
   }
 
   return (
-    <main style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif' }}>
-      <h1>
-        Carte — {account.user.firstName} {account.user.lastName}
-      </h1>
-      <p>Solde : {account.balance.toFixed(2)} €</p>
+    <div className="flex flex-col gap-6">
+      <BackLink href={`/parent/children/${childId}`} />
+
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Carte — {account.user.firstName} {account.user.lastName}
+        </h1>
+        <p className="mt-1 text-muted-foreground">
+          Solde : {account.balance.toFixed(2)} €
+        </p>
+      </div>
+
       <CardBlockToggle
         params={params}
         initialBlocked={account.blocked}
         initialBlockedBy={account.blockedBy}
       />
-    </main>
+    </div>
   );
 }
