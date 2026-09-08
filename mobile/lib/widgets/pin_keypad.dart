@@ -77,10 +77,16 @@ class PinKeypad extends StatelessWidget {
             children: [
               const SizedBox(width: 72, height: 72),
               _KeyButton(digit: '0', onTap: () => onKeyPressed('0')),
-              IconButton(
-                icon: const Icon(Icons.backspace_outlined),
-                iconSize: 28,
-                onPressed: onDeletePressed,
+              SizedBox(
+                width: 72,
+                height: 72,
+                child: Center(
+                  child: IconButton(
+                    icon: const Icon(Icons.backspace_outlined),
+                    iconSize: 28,
+                    onPressed: onDeletePressed,
+                  ),
+                ),
               ),
             ],
           ),
