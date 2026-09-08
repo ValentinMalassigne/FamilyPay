@@ -169,6 +169,7 @@ type AIInsight {
 # Queries
 type Query {
   me: User!
+  myChildAccount: ChildAccount!
   childAccount(childId: ID!): ChildAccount!
   transactions(childId: ID!): [Transaction!]!
   pots(childId: ID!): [Pot!]!

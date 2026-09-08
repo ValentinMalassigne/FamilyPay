@@ -52,6 +52,39 @@ export class UsersResolver {
   }
 
   /*
+   * Query myChildAccount : retourne le ChildAccount de l'enfant authentifié.
+   *
+   * Schéma §6 (ajout) : myChildAccount: ChildAccount!
+   *
+   * @UseGuards(RolesGuard) + @Roles(Role.CHILD) : seul un enfant consulte
+   * SON propre compte. GqlAuthGuard (global via APP_GUARD) vérifie le JWT au
+   * préalable. Un parent n'a pas accès à cette query — il utilise
+   * childAccount(childId) ou myChildren.
+   *
+   * @CurrentUser() user : payload JWT de l'enfant (user.sub = son User ID,
+   * qui sert de childId partout dans le backend).
+   *
+   * L'enfant a besoin de cette query pour récupérer son solde initial et
+   * l'état de blocage de sa carte au chargement de l'app, car :
+   *  - me retourne un User (pas de balance, pas de blocked).
+   *  - childAccount(childId) est @Roles(Role.PARENT) — inaccessible à l'enfant.
+   *  - balanceUpdated (subscription) ne se déclenche qu'en cas de changement,
+   *    pas au chargement initial.
+   *
+   * @throws NotFoundException si l'enfant n'a pas de ChildAccount (cas anormal).
+   */
+  @Query(() => ChildAccount)
+  @UseGuards(RolesGuard)
+  @Roles(Role.CHILD)
+  async myChildAccount(@CurrentUser() user: JwtPayload): Promise<ChildAccount> {
+    const account = await this.usersService.findChildAccountByUserId(user.sub);
+    if (!account) {
+      throw new NotFoundException('Compte enfant non trouvé');
+    }
+    return account;
+  }
+
+  /*
    * Query childAccount : retourne le compte d'un enfant (solde, blocage).
    *
    * Schéma §6 : childAccount(childId: ID!): ChildAccount!
