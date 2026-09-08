@@ -11,6 +11,8 @@ import '../../models/child_account.dart';
 /// - `Query` `myChildAccount` → charge le solde initial.
 /// - `Subscription` `balanceUpdated` → met à jour le solde en temps réel
 ///   sans recharger la query.
+/// - `Subscription` `cardBlocked` → met à jour l'état de blocage de la carte
+///   en temps réel (utile quand le parent bloque/débloque à distance).
 /// - `Mutation` `setCardBlocked` → bloque/débloque la carte.
 ///
 /// Si `blockedBy == "PARENT"` : le Switch est désactivé + message informatif.
@@ -27,15 +29,18 @@ class BalanceTab extends StatefulWidget {
 
 class _BalanceTabState extends State<BalanceTab> {
   /// Compte courant : initialisé par la query, puis mis à jour par la
-  /// subscription `balanceUpdated` et la mutation `setCardBlocked`.
+  /// subscription `balanceUpdated` (solde), la subscription `cardBlocked`
+  /// (état de blocage) et la mutation `setCardBlocked`.
   ChildAccount? _account;
   StreamSubscription<QueryResult>? _balanceSub;
+  StreamSubscription<QueryResult>? _cardSub;
   bool _toggling = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _subscribeBalance();
+    _subscribeCardBlocked();
   }
 
   /// Souscrit à la subscription `balanceUpdated` via le client GraphQL brut.
@@ -59,9 +64,41 @@ class _BalanceTabState extends State<BalanceTab> {
         });
   }
 
+  /// Souscrit à la subscription `cardBlocked` pour mettre à jour l'état du
+  /// switch en temps réel quand le parent bloque/débloque la carte à distance.
+  /// La subscription ne renvoie que id/blocked/blockedBy (pas balance), donc
+  /// on fusionne avec le `_account` existant pour ne pas perdre le solde.
+  void _subscribeCardBlocked() {
+    if (_cardSub != null) return;
+
+    final client = GraphQLProvider.of(context).value;
+    _cardSub = client
+        .subscribe(SubscriptionOptions(
+          document: kCardBlockedSubscription,
+          variables: {'childId': widget.childId},
+        ))
+        .listen((result) {
+          final data = result.data?['cardBlocked'];
+          if (data == null) return;
+          final blocked = data['blocked'] as bool? ?? false;
+          final blockedBy = data['blockedBy'] as String?;
+          if (mounted) {
+            setState(() {
+              _account = ChildAccount(
+                id: _account?.id ?? data['id'] as String,
+                balance: _account?.balance ?? 0,
+                blocked: blocked,
+                blockedBy: blockedBy,
+              );
+            });
+          }
+        });
+  }
+
   @override
   void dispose() {
     _balanceSub?.cancel();
+    _cardSub?.cancel();
     super.dispose();
   }
 
