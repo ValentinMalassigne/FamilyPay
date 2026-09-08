@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ImagePlaceholder } from '@/components/image-placeholder';
+import { Logo } from '@/components/logo';
 
 // Page d'inscription (POST /api/auth/signup).
 //
@@ -57,8 +57,7 @@ export default function SignupPage() {
     <main className="flex min-h-screen items-center justify-center px-4 py-8">
       <Card className="w-full max-w-md">
         <CardHeader className="items-center text-center">
-          {/* TODO: replace with actual logo image */}
-          <ImagePlaceholder className="size-12" />
+          <Logo className="size-12" />
           <CardTitle className="text-2xl">Créer ma famille</CardTitle>
           <CardDescription>
             Crée ton compte parent et ta première famille

@@ -1,7 +1,7 @@
 import { getTokenFromCookie } from '@/lib/graphql-server';
 import { LogoutButton } from '../parent/LogoutButton';
 import { Card, CardContent } from '@/components/ui/card';
-import { ImagePlaceholder } from '@/components/image-placeholder';
+import { Logo } from '@/components/logo';
 
 // Page de fallback pour un compte enfant (Server Component).
 //
@@ -22,8 +22,7 @@ export default async function ChildPage() {
     <main className="flex min-h-screen items-center justify-center px-4 py-8">
       <Card className="w-full max-w-md">
         <CardContent className="flex flex-col items-center gap-4 text-center">
-          {/* TODO: replace with actual logo image */}
-          <ImagePlaceholder className="size-12" />
+          <Logo className="size-12" />
           <h1 className="text-xl font-semibold">Compte enfant</h1>
           <p className="text-sm text-muted-foreground">
             Ton compte est un compte enfant. Accède à ton solde, tes missions et

@@ -12,6 +12,9 @@ import './globals.css';
 export const metadata = {
   title: 'FamilyPay',
   description: "Espace parent FamilyPay — gestion de l'argent de poche",
+  // Favicon (onglet navigateur) et Apple touch icon : un seul fichier
+  // logo.png servi depuis /public, réutilisé par le composant <Logo>.
+  icons: { icon: '/logo.png', apple: '/logo.png' },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
