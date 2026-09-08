@@ -8,6 +8,7 @@ import '../graphql/child_operations.dart';
 import '../models/child_account.dart';
 import '../models/transaction.dart';
 import '../services/auth_service.dart';
+import '../services/lock_service.dart';
 import '../utils/token_store.dart';
 import 'tabs/balance_tab.dart';
 import 'tabs/missions_tab.dart';
@@ -31,7 +32,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
 
   // Subscriptions app-level : servent uniquement à afficher un SnackBar quand
@@ -49,6 +50,23 @@ class _HomeScreenState extends State<HomeScreen> {
   // événement avant d'en afficher un seul (messages joints par « · »).
   final List<String> _pendingMessages = [];
   Timer? _debounceTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    // On s'enregistre comme observer du cycle de vie de l'app pour pouvoir
+    // re-verrouiller (LockService.lock) quand l'app passe en arrière-plan.
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Quand l'app passe en arrière-plan, on re-verrouille : à son retour,
+    // l'utilisateur devra ressaisir son PIN (ou utiliser la biométrie).
+    if (state == AppLifecycleState.paused) {
+      context.read<LockService>().lock();
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -154,6 +172,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _debounceTimer?.cancel();
     _balanceSub?.cancel();
     _txnSub?.cancel();
@@ -166,6 +185,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final tokenStore = context.watch<TokenStore>();
     final authService = context.read<AuthService>();
+    final lockService = context.read<LockService>();
     final childId = tokenStore.user?.id;
 
     // Tant qu'on n'a pas de childId (ne devrait pas arriver après login),
@@ -191,7 +211,12 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Déconnexion',
-            onPressed: authService.logout,
+            onPressed: () async {
+              // La déconnexion efface la session ET le code PIN : au prochain
+              // login, l'utilisateur devra recréer un PIN.
+              await lockService.clearPin();
+              await authService.logout();
+            },
           ),
         ],
       ),

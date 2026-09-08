@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:familypay/config/graphql_client.dart';
 import 'package:familypay/models/app_user.dart';
 import 'package:familypay/services/auth_service.dart';
+import 'package:familypay/services/lock_service.dart';
 import 'package:familypay/services/secure_storage_service.dart';
 import 'package:familypay/utils/token_store.dart';
 
@@ -51,6 +52,34 @@ void _setupSecureStorageMock() {
   });
 }
 
+// Construit un utilisateur factice pour les tests.
+final _fakeUser = AppUser(
+  id: '1',
+  email: 'enfant@test.com',
+  role: 'CHILD',
+  firstName: 'Alice',
+  lastName: 'Doe',
+);
+
+// Construit le widget racine avec tous les providers nécessaires.
+Widget _testApp(
+  TokenStore tokenStore,
+  AuthService authService,
+  SecureStorageService storage,
+  LockService lockService,
+  ValueNotifier<GraphQLClient> client,
+) {
+  return MultiProvider(
+    providers: [
+      ChangeNotifierProvider<TokenStore>.value(value: tokenStore),
+      ChangeNotifierProvider<AuthService>.value(value: authService),
+      Provider<SecureStorageService>.value(value: storage),
+      ChangeNotifierProvider<LockService>.value(value: lockService),
+    ],
+    child: FamilyPayApp(client: client),
+  );
+}
+
 void main() {
   setUp(() {
     _mockStore.clear();
@@ -66,18 +95,13 @@ void main() {
       (WidgetTester tester) async {
     final storage = SecureStorageService();
     final tokenStore = TokenStore();
+    final lockService = LockService(storage);
+    await lockService.init();
     final client = ValueNotifier<GraphQLClient>(_fakeClient());
     final authService = AuthService(tokenStore, storage, client.value);
 
     await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider<TokenStore>.value(value: tokenStore),
-          ChangeNotifierProvider<AuthService>.value(value: authService),
-          Provider<SecureStorageService>.value(value: storage),
-        ],
-        child: FamilyPayApp(client: client),
-      ),
+      _testApp(tokenStore, authService, storage, lockService, client),
     );
 
     // L'écran de login est affiché (non authentifié).
@@ -86,37 +110,40 @@ void main() {
     expect(find.text('Se connecter'), findsOneWidget);
   });
 
-  testWidgets('affiche l\'écran d\'accueil quand authentifié',
+  testWidgets('affiche l\'écran de création de PIN quand authentifié sans PIN',
       (WidgetTester tester) async {
     final storage = SecureStorageService();
     final tokenStore = TokenStore();
-    // Simule un utilisateur connecté.
-    await tokenStore.setSession(
-      'fake-jwt',
-      AppUser(
-        id: '1',
-        email: 'enfant@test.com',
-        role: 'CHILD',
-        firstName: 'Alice',
-        lastName: 'Doe',
-      ),
-      storage,
-    );
+    await tokenStore.setSession('fake-jwt', _fakeUser, storage);
+    final lockService = LockService(storage);
+    await lockService.init(); // pinSet = false
     final client = ValueNotifier<GraphQLClient>(_fakeClient());
     final authService = AuthService(tokenStore, storage, client.value);
 
     await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider<TokenStore>.value(value: tokenStore),
-          ChangeNotifierProvider<AuthService>.value(value: authService),
-          Provider<SecureStorageService>.value(value: storage),
-        ],
-        child: FamilyPayApp(client: client),
-      ),
+      _testApp(tokenStore, authService, storage, lockService, client),
     );
 
-    // L'écran d'accueil est affiché (authentifié).
+    // Authentifié mais pas de PIN → PinSetupScreen.
+    expect(find.text('Crée ton code PIN'), findsOneWidget);
+  });
+
+  testWidgets('affiche l\'écran d\'accueil quand authentifié et déverrouillé',
+      (WidgetTester tester) async {
+    final storage = SecureStorageService();
+    final tokenStore = TokenStore();
+    await tokenStore.setSession('fake-jwt', _fakeUser, storage);
+    final lockService = LockService(storage);
+    // setPin persiste le hash et déverrouille (pinSet=true, unlocked=true).
+    await lockService.setPin('1234');
+    final client = ValueNotifier<GraphQLClient>(_fakeClient());
+    final authService = AuthService(tokenStore, storage, client.value);
+
+    await tester.pumpWidget(
+      _testApp(tokenStore, authService, storage, lockService, client),
+    );
+
+    // Authentifié + PIN + déverrouillé → HomeScreen.
     expect(find.text('FamilyPay'), findsOneWidget);
     expect(find.byIcon(Icons.logout), findsOneWidget);
   });
