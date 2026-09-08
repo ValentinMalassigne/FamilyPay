@@ -53,6 +53,10 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
 
+  # Génère les icônes de lancement Android (mipmap-*) et iOS (AppIcon.appiconset)
+  # à partir de assets/logo.png. Lancé via `dart run flutter_launcher_icons`.
+  flutter_launcher_icons: ^0.14.3
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
@@ -66,8 +70,11 @@ flutter:
 
   # Fichier .env chargé au runtime par flutter_dotenv.
   # Le .env réel est gitignored ; on committe seulement .env.example.
+  # logo.png : logo FamilyPay, aussi utilisé par flutter_launcher_icons pour
+  # générer les icônes de lancement Android/iOS (voir la config plus bas).
   assets:
     - .env
+    - assets/logo.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:
@@ -99,3 +106,14 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# Configuration de flutter_launcher_icons : régénère toutes les tailles
+# d'icônes Android (mipmap-*) et iOS (AppIcon.appiconset) depuis assets/logo.png.
+# remove_alpha_ios: true car les icônes iOS ne doivent pas avoir de canal alpha
+# (exigence App Store). L'image source (1254×1254) dépasse le minimum 1024×1024
+# requis pour l'icône marketing.
+flutter_launcher_icons:
+  image_path: "assets/logo.png"
+  android: true
+  ios: true
+  remove_alpha_ios: true
