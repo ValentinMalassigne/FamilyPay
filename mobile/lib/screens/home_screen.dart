@@ -101,9 +101,12 @@ class _HomeScreenState extends State<HomeScreen> {
         .listen((result) {
       final data = result.data?['cardBlocked'];
       if (data == null) return;
-      final account = ChildAccount.fromJson(data as Map<String, dynamic>);
-      if (account.blocked) {
-        final byParent = account.blockedBy == 'PARENT' ? ' par un parent' : '';
+      // La subscription ne demande que id/blocked/blockedBy (pas balance),
+      // donc on ne passe pas par ChildAccount.fromJson qui attend `balance`.
+      final blocked = data['blocked'] as bool? ?? false;
+      final blockedBy = data['blockedBy'] as String?;
+      if (blocked) {
+        final byParent = blockedBy == 'PARENT' ? ' par un parent' : '';
         _queueMessage('Carte bloquée$byParent');
       } else {
         _queueMessage('Carte débloquée');
