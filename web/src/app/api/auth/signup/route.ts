@@ -52,7 +52,9 @@ export async function POST(request: Request) {
     sameSite: 'lax',
     path: '/',
     maxAge: 60 * 60 * 24 * 7,
-    secure: process.env.NODE_ENV === 'production',
+    // secure dépend du transport (HTTP vs HTTPS), pas du build mode.
+    // COOKIE_SECURE=true uniquement quand TLS est actif. Non défini → false.
+    secure: process.env.COOKIE_SECURE === 'true',
   });
 
   return response;

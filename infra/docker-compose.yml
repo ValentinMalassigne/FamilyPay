@@ -57,6 +57,9 @@ services:
       # Elle doit pointer vers une URL accessible depuis le navigateur (pas
       # depuis le réseau Docker) → http://localhost:3000/graphql en dev local.
       NEXT_PUBLIC_GRAPHQL_URL: ${NEXT_PUBLIC_GRAPHQL_URL:-http://localhost:3000/graphql}
+      # COOKIE_SECURE : false tant qu'on sert en HTTP plain (pas de TLS).
+      # Passer à "true" quand HTTPS sera en place (ALB / Nginx + certbot).
+      COOKIE_SECURE: "false"
 
   # Reverse proxy Nginx : seul point d'entrée public (port 80).
   # Route / vers nextjs et /graphql vers backend (HTTP + WebSocket pour

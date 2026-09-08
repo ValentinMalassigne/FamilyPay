@@ -41,15 +41,17 @@ export async function POST(request: Request) {
   const role = result.data.login.user.role;
 
   // Pose le cookie httpOnly. SameSite=Lax protège contre CSRF pour les
-  // requêtes cross-site simples. secure=false en dev (HTTP) ; en production
-  // (HTTPS) il faudrait secure=true via une variable d'env.
+  // requêtes cross-site simples.
   const response = NextResponse.json({ ok: true, role });
   response.cookies.set(AUTH_COOKIE, token, {
     httpOnly: true,
     sameSite: 'lax',
     path: '/',
     maxAge: 60 * 60 * 24 * 7, // 7 jours, aligné sur l'expiration du JWT backend.
-    secure: process.env.NODE_ENV === 'production',
+    // secure dépend du transport (HTTP vs HTTPS), pas du build mode.
+    // COOKIE_SECURE=true uniquement quand TLS est actif (ex. derrière un ALB
+    // ou Nginx avec certbot). Non défini → false (HTTP plain, EC2 actuelle).
+    secure: process.env.COOKIE_SECURE === 'true',
   });
 
   return response;
