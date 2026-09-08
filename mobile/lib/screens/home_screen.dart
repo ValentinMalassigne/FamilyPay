@@ -19,7 +19,8 @@ import 'settings_screen.dart';
 /// Écran d'accueil de l'app enfant : scaffold avec bottom navigation à 4 onglets.
 ///
 /// Onglets :
-///  1. Solde       — balance + blocage carte
+///  1. Accueil     — solde + carte + résumés (dernière opération, cagnotte,
+///                   mission) + bouton nouvelle dépense
 ///  2. Opérations  — historique transactions + ajout dépense
 ///  3. Cagnottes   — liste + progression + retrait
 ///  4. Missions    — liste + marquer fait
@@ -199,7 +200,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
 
     final tabs = [
-      HomeTab(childId: childId),
+      HomeTab(
+        childId: childId,
+        onNavigateToTab: (i) => setState(() => _currentIndex = i),
+      ),
       TransactionsTab(childId: childId),
       PotsTab(childId: childId),
       MissionsTab(childId: childId),
@@ -238,8 +242,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         },
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.account_balance_wallet),
-            label: 'Solde',
+            icon: Icon(Icons.home),
+            label: 'Accueil',
           ),
           NavigationDestination(
             icon: Icon(Icons.receipt_long),
