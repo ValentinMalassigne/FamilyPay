@@ -1,10 +1,9 @@
 # FamilyPay
 
-App de gestion d'argent de poche pour ados (projet de démo, inspiré de Pixpay,
-sans lien commercial). Transactions simulées en base, pas de vrai paiement.
+App de gestion d'argent de poche pour ados (projet de démo, inspiré de Pixpay).
 
 La spec complète (produit, modèle de données, schéma GraphQL, conventions) est
-dans [`PROJECT_CONTEXT.md`](./PROJECT_CONTEXT.md) — c'est la source de vérité.
+dans [`PROJECT_CONTEXT.md`](./PROJECT_CONTEXT.md).
 
 ## Structure du monorepo
 
